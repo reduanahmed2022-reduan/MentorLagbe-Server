@@ -1,19 +1,23 @@
 
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin: "http://localhost:3000",
-}));
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+  })
+);
 
 app.use(express.json());
 
-// Test route
+// Home route
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
