@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
+import tutorRoutes from "./routes/tutorRoutes.js";
 
 dotenv.config();
 
@@ -15,6 +16,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Tutor API
+app.use("/api/tutors", tutorRoutes);
 
 // Home route
 app.get("/", (req, res) => {

@@ -27,7 +27,7 @@ export async function connectDB() {
 
   await client.connect();
 
-  database = client.db("MentorLagbe");
+  database = client.db("MantorLagbe");
 
   await database.command({ ping: 1 });
 
