@@ -5,7 +5,8 @@ import {
   createTuition,
   getAllTuitions,
   getPendingTuitions,
-   reviewTuition,
+  reviewTuition,
+  getMyTuitions,
 } from "../controllers/tuitionController.js";
 
 import {
@@ -41,6 +42,14 @@ router.patch(
   verifyToken,
   verifyAdmin,
   reviewTuition
+);
+
+// Tutor Only: Get My Tuitions
+router.get(
+  "/my-tuitions",
+  verifyToken,
+  verifyTutor,
+  getMyTuitions
 );
 
 export default router;

@@ -236,3 +236,53 @@ export const reviewTuition = async (req, res) => {
     });
   }
 };
+
+// Tutor: Get My Tuitions
+export const getMyTuitions = async (req, res) => {
+  try {
+    if (!ObjectId.isValid(req.user.userId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid user information",
+      });
+    }
+
+    const db = getDB();
+
+    // Find Logged-in Tutor
+    const tutor = await db.collection("users").findOne({
+      _id: new ObjectId(req.user.userId),
+      role: "tutor",
+    });
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor account not found",
+      });
+    }
+
+    // Get All Tuitions Created by This Tutor
+    const tuitions = await db
+      .collection("tuitions")
+      .find({
+        tutorEmail: tutor.email,
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return res.status(200).json({
+      success: true,
+      total: tuitions.length,
+      tuitions,
+    });
+  } catch (error) {
+    console.error("Get My Tuitions Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve your tuitions",
+    });
+  }
+};
+
