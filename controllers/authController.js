@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { getDB } from "../config/db.js";
+import { ObjectId } from "mongodb";
 
 export const registerUser = async (req, res) => {
   try {
@@ -168,6 +169,42 @@ export const loginUser = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Login failed",
+    });
+  }
+};
+
+// Get Logged-in User Profile
+export const getMyProfile = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(req.user.userId) },
+      {
+        projection: {
+          password: 0,
+        },
+      }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Profile retrieved successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Get Profile Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve profile",
     });
   }
 };
