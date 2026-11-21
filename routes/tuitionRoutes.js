@@ -7,6 +7,7 @@ import {
   getPendingTuitions,
   reviewTuition,
   getMyTuitions,
+  updateMyTuition,
 } from "../controllers/tuitionController.js";
 
 import {
@@ -50,6 +51,14 @@ router.get(
   verifyToken,
   verifyTutor,
   getMyTuitions
+);
+
+// Tutor Only: Update My Tuition
+router.patch(
+  "/:id",
+  verifyToken,
+  verifyTutor,
+  updateMyTuition
 );
 
 export default router;

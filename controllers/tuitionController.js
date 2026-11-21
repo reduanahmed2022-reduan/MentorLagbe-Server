@@ -286,3 +286,114 @@ export const getMyTuitions = async (req, res) => {
   }
 };
 
+
+ // Tutor: Update My Tuition
+export const updateMyTuition = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tuition ID",
+      });
+    }
+
+    const {
+      title,
+      subject,
+      classLevel,
+      mode,
+      location,
+      monthlyFee,
+      daysPerWeek,
+      description,
+    } = req.body;
+
+    // Validate Required Fields
+    if (
+      !title?.trim() ||
+      !subject?.trim() ||
+      !classLevel?.trim() ||
+      !["Online", "Offline"].includes(mode) ||
+      !location?.trim() ||
+      !description?.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide all required tuition information",
+      });
+    }
+
+    const fee = Number(monthlyFee);
+    const days = Number(daysPerWeek);
+
+    if (!Number.isFinite(fee) || fee <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Monthly fee must be a positive number",
+      });
+    }
+
+    if (!Number.isInteger(days) || days < 1 || days > 7) {
+      return res.status(400).json({
+        success: false,
+        message: "Days per week must be between 1 and 7",
+      });
+    }
+
+    const db = getDB();
+
+    const tutor = await db.collection("users").findOne({
+      _id: new ObjectId(req.user.userId),
+      role: "tutor",
+    });
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor account not found",
+      });
+    }
+
+    // Update Only Own Tuition
+    const result = await db.collection("tuitions").updateOne(
+      {
+        _id: new ObjectId(id),
+        tutorEmail: tutor.email,
+      },
+      {
+        $set: {
+          title: title.trim(),
+          subject: subject.trim(),
+          classLevel: classLevel.trim(),
+          mode,
+          location: location.trim(),
+          monthlyFee: fee,
+          daysPerWeek: days,
+          description: description.trim(),
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Tuition not found or access denied",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Tuition updated successfully",
+    });
+  } catch (error) {
+    console.error("Update My Tuition Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update tuition",
+    });
+  }
+};
