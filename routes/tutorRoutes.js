@@ -5,14 +5,76 @@ import { getDB } from "../config/db.js";
 
 const router = express.Router();
 
-// GET: Get all tutors
+ // GET: Search, filter and sort tutors
 router.get("/", async (req, res) => {
   try {
     const db = getDB();
 
+    const {
+      subject,
+      location,
+      mode,
+      minRate,
+      maxRate,
+      sort,
+    } = req.query;
+
+    const query = {};
+
+    // Search by subject
+    if (subject) {
+      query.subject = {
+        $regex: String(subject),
+        $options: "i",
+      };
+    }
+
+    // Filter by location
+    if (location) {
+      query.location = {
+        $regex: String(location),
+        $options: "i",
+      };
+    }
+
+    // Filter by teaching mode
+    if (mode) {
+      query.mode = {
+        $regex: String(mode),
+        $options: "i",
+      };
+    }
+
+    // Filter by hourly rate
+    if (minRate !== undefined || maxRate !== undefined) {
+      query.hourlyRate = {};
+
+      if (minRate !== undefined) {
+        query.hourlyRate.$gte = Number(minRate);
+      }
+
+      if (maxRate !== undefined) {
+        query.hourlyRate.$lte = Number(maxRate);
+      }
+    }
+
+    // Sorting
+    let sortOption = {};
+
+    if (sort === "price-low") {
+      sortOption = { hourlyRate: 1 };
+    } else if (sort === "price-high") {
+      sortOption = { hourlyRate: -1 };
+    } else if (sort === "rating") {
+      sortOption = { rating: -1 };
+    } else {
+      sortOption = { createdAt: -1 };
+    }
+
     const tutors = await db
       .collection("tutors")
-      .find()
+      .find(query)
+      .sort(sortOption)
       .toArray();
 
     const formattedTutors = tutors.map((tutor) => ({
@@ -27,6 +89,8 @@ router.get("/", async (req, res) => {
       tutors: formattedTutors,
     });
   } catch (error) {
+    console.error("Fetch tutors error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch tutors",
