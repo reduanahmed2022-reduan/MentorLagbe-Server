@@ -1,9 +1,9 @@
 
 import jwt from "jsonwebtoken";
 
+// Verify JWT Token
 export const verifyToken = (req, res, next) => {
   try {
-    // Get token from Authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -15,10 +15,8 @@ export const verifyToken = (req, res, next) => {
 
     const token = authHeader.split(" ")[1];
 
-    // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Attach user information to request
     req.user = decoded;
 
     next();
@@ -30,8 +28,7 @@ export const verifyToken = (req, res, next) => {
   }
 };
 
-
-
+// Check User Role
 export const authorizeRole = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -51,3 +48,12 @@ export const authorizeRole = (...allowedRoles) => {
     next();
   };
 };
+
+// Student Only
+export const verifyStudent = authorizeRole("student");
+
+// Tutor Only
+export const verifyTutor = authorizeRole("tutor");
+
+// Admin Only
+export const verifyAdmin = authorizeRole("admin");
