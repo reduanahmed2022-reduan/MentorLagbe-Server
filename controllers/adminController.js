@@ -33,3 +33,30 @@ export const getAllUsers = async (req, res) => {
     });
   }
 };
+
+
+// Admin: Get All Tuitions
+export const getAllAdminTuitions = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const tuitions = await db
+      .collection("tuitions")
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return res.status(200).json({
+      success: true,
+      total: tuitions.length,
+      tuitions,
+    });
+  } catch (error) {
+    console.error("Get All Admin Tuitions Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve all tuitions",
+    });
+  }
+};

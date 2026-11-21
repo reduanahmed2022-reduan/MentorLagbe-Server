@@ -1,7 +1,7 @@
 
 import express from "express";
 
-import { getAllUsers } from "../controllers/adminController.js";
+import { getAllUsers, getAllAdminTuitions, } from "../controllers/adminController.js";
 
 import {
   verifyToken,
@@ -16,6 +16,14 @@ router.get(
   verifyToken,
   verifyAdmin,
   getAllUsers
+);
+
+// Admin Only: Get All Tuitions
+router.get(
+  "/tuitions",
+  verifyToken,
+  verifyAdmin,
+  getAllAdminTuitions
 );
 
 export default router;
