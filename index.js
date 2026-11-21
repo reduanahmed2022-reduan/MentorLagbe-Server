@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import tutorRoutes from "./routes/tutorRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import tuitionRoutes from "./routes/tuitionRoutes.js";
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use(express.json());
 // API Routes
 app.use("/api/tutors", tutorRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/tuitions", tuitionRoutes);
 
 // Home route
 app.get("/", (req, res) => {
