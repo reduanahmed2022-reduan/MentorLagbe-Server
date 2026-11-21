@@ -8,6 +8,7 @@ import {
   reviewTuition,
   getMyTuitions,
   updateMyTuition,
+  deleteMyTuition,
 } from "../controllers/tuitionController.js";
 
 import {
@@ -59,6 +60,14 @@ router.patch(
   verifyToken,
   verifyTutor,
   updateMyTuition
+);
+
+// Tutor Only: Delete My Tuition
+router.delete(
+  "/:id",
+  verifyToken,
+  verifyTutor,
+  deleteMyTuition
 );
 
 export default router;

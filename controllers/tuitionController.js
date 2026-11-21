@@ -397,3 +397,61 @@ export const updateMyTuition = async (req, res) => {
     });
   }
 };
+
+
+// Tutor Only: Delete My Tuition
+export const deleteMyTuition = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tuition ID",
+      });
+    }
+
+    const db = getDB();
+
+    const tutor = await db.collection("users").findOne({
+      _id: new ObjectId(req.user.userId),
+      role: "tutor",
+    });
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor not found",
+      });
+    }
+
+    const tuition = await db.collection("tuitions").findOne({
+      _id: new ObjectId(id),
+      tutorEmail: tutor.email,
+    });
+
+    if (!tuition) {
+      return res.status(404).json({
+        success: false,
+        message: "Tuition not found or you do not have permission to delete it",
+      });
+    }
+
+    await db.collection("tuitions").deleteOne({
+      _id: new ObjectId(id),
+      tutorEmail: tutor.email,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Tuition deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete tuition error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete tuition",
+    });
+  }
+};
