@@ -148,3 +148,148 @@ export const applyToTuition = async (req, res) => {
     });
   }
 };
+
+
+// Tutor: Get Applicants for My Tuitions
+export const getTutorApplicants = async (req, res) => {
+  try {
+    if (!ObjectId.isValid(req.user.userId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid user information",
+      });
+    }
+
+    const db = getDB();
+
+    // Find Logged-in Tutor
+    const tutor = await db.collection("users").findOne({
+      _id: new ObjectId(req.user.userId),
+      role: "tutor",
+    });
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor account not found",
+      });
+    }
+
+    // Get Only This Tutor's Applicants
+    const applicants = await db
+      .collection("applications")
+      .find({
+        tutorEmail: tutor.email,
+      })
+      .sort({ appliedAt: -1 })
+      .toArray();
+
+    return res.status(200).json({
+      success: true,
+      total: applicants.length,
+      applicants,
+    });
+  } catch (error) {
+    console.error("Get Tutor Applicants Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve applicants",
+    });
+  }
+};
+
+// Tutor: Accept or Reject Student Application
+export const updateApplicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate Application ID
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid application ID",
+      });
+    }
+
+    // Validate Application Status
+    if (!["accepted", "rejected"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be accepted or rejected",
+      });
+    }
+
+    const db = getDB();
+
+    // Find Logged-in Tutor
+    const tutor = await db.collection("users").findOne({
+      _id: new ObjectId(req.user.userId),
+      role: "tutor",
+    });
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor account not found",
+      });
+    }
+
+    // Find Application Belonging to This Tutor
+    const application = await db.collection("applications").findOne({
+      _id: new ObjectId(id),
+      tutorEmail: tutor.email,
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found or access denied",
+      });
+    }
+
+    // Only Pending Applications Can Be Updated
+    if (application.status !== "pending") {
+      return res.status(409).json({
+        success: false,
+        message: "This application has already been reviewed",
+      });
+    }
+
+    // Update Application Status
+    const result = await db.collection("applications").updateOne(
+      {
+        _id: new ObjectId(id),
+        tutorEmail: tutor.email,
+        status: "pending",
+      },
+      {
+        $set: {
+          status,
+          reviewedAt: new Date(),
+        },
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Application status could not be updated",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Application ${status} successfully`,
+      status,
+    });
+  } catch (error) {
+    console.error("Update Application Status Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update application status",
+    });
+  }
+};
