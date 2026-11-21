@@ -6,6 +6,7 @@ import { connectDB } from "./config/db.js";
 import tutorRoutes from "./routes/tutorRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import tuitionRoutes from "./routes/tuitionRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use(express.json());
 app.use("/api/tutors", tutorRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/tuitions", tuitionRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Home route
 app.get("/", (req, res) => {
