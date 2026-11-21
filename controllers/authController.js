@@ -208,3 +208,64 @@ export const getMyProfile = async (req, res) => {
     });
   }
 };
+
+
+ // Update Logged-in User Profile
+export const updateMyProfile = async (req, res) => {
+  try {
+    const { name, phone, location, profileImage, bio } = req.body;
+
+    const updateData = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (location !== undefined) updateData.location = location;
+    if (profileImage !== undefined) updateData.profileImage = profileImage;
+    if (bio !== undefined) updateData.bio = bio;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide at least one field to update",
+      });
+    }
+
+    updateData.updatedAt = new Date();
+
+    const db = getDB();
+
+    const result = await db.collection("users").updateOne(
+      { _id: new ObjectId(req.user.userId) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const updatedUser = await db.collection("users").findOne(
+      { _id: new ObjectId(req.user.userId) },
+      {
+        projection: {
+          password: 0,
+        },
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update Profile Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile",
+    });
+  }
+};

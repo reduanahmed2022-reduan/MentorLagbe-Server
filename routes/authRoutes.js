@@ -5,6 +5,7 @@ import {
   registerUser,
   loginUser,
   getMyProfile,
+  updateMyProfile,
 } from "../controllers/authController.js";
 
 import {
@@ -22,6 +23,9 @@ router.post("/login", loginUser);
 
 // Get Logged-in User Profile
 router.get("/me", verifyToken, getMyProfile);
+
+// Update Logged-in User Profile
+router.put("/me", verifyToken, updateMyProfile);
 
 // Student Only Route
 router.get(
