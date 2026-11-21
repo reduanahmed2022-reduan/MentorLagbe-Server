@@ -2,10 +2,11 @@
 import express from "express";
 
 import {
-     getAllUsers,
-     getAllAdminTuitions,  
-     getAdminStats, 
-    } from "../controllers/adminController.js";
+  getAllUsers,
+  getAllAdminTuitions,
+  getAdminStats,
+  getAllTransactions,
+} from "../controllers/adminController.js";
 
 import {
   verifyToken,
@@ -19,7 +20,8 @@ router.get(
   "/users",
   verifyToken,
   verifyAdmin,
-  getAllUsers
+  getAllUsers,
+ getAllTransactions,
 );
 
 // Admin Only: Get All Tuitions
@@ -36,6 +38,14 @@ router.get(
   verifyToken,
   verifyAdmin,
   getAdminStats
+);
+
+// Admin Only: Get All Transactions
+router.get(
+  "/transactions",
+  verifyToken,
+  verifyAdmin,
+  getAllTransactions
 );
 
 export default router;

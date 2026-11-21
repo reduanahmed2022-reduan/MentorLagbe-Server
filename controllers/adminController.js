@@ -116,3 +116,31 @@ export const getAdminStats = async (req, res) => {
   }
 };
 
+
+ // Admin: Get All Transactions
+export const getAllTransactions = async (req, res) => {
+  try {
+    const db = getDB();
+
+    const transactions = await db
+      .collection("payments")
+      .find({})
+      .sort({ paidAt: -1 })
+      .toArray();
+
+    return res.status(200).json({
+      success: true,
+      total: transactions.length,
+      transactions,
+    });
+  } catch (error) {
+    console.error("Get All Transactions Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve transactions",
+    });
+  }
+};
+
+
