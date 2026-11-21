@@ -5,6 +5,7 @@ import {
   createTuition,
   getAllTuitions,
   getPendingTuitions,
+   reviewTuition,
 } from "../controllers/tuitionController.js";
 
 import {
@@ -32,6 +33,14 @@ router.get(
   verifyToken,
   verifyAdmin,
   getPendingTuitions
+);
+
+// Admin Only: Approve or Reject Tuition
+router.patch(
+  "/admin/review/:id",
+  verifyToken,
+  verifyAdmin,
+  reviewTuition
 );
 
 export default router;
