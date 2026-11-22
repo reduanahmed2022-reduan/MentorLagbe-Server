@@ -2,7 +2,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { connectDB } from "./config/db.js";
+import { closeDB, connectDB, getDB } from "./config/db.js";
+import { CLIENT_ORIGINS, CLIENT_URL } from "./config/stripe.js";
 import tutorRoutes from "./routes/tutorRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import tuitionRoutes from "./routes/tuitionRoutes.js";
@@ -18,10 +19,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:3000")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = CLIENT_ORIGINS;
 
 app.use(
   cors({
@@ -59,12 +57,21 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health route
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    status: "OK",
-  });
+// Health route (also confirms the database is still reachable)
+app.get("/health", async (req, res) => {
+  try {
+    await getDB().command({ ping: 1 });
+
+    return res.status(200).json({
+      success: true,
+      status: "OK",
+    });
+  } catch (error) {
+    return res.status(503).json({
+      success: false,
+      status: "DATABASE_UNAVAILABLE",
+    });
+  }
 });
 
 // Unknown API routes should return JSON instead of an HTML 404 page.
@@ -106,13 +113,46 @@ async function startServer() {
       throw new Error("JWT_SECRET is missing from .env file");
     }
 
+    if (process.env.NODE_ENV === "production") {
+      for (const key of [
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "IMGBB_API_KEY",
+      ]) {
+        if (!process.env[key]) {
+          console.warn(`Warning: ${key} is not set; related features will return 503.`);
+        }
+      }
+
+      if (CLIENT_URL.startsWith("http://localhost")) {
+        console.warn("Warning: CLIENT_URL still points to localhost; CORS and Stripe redirects will fail in production.");
+      }
+    }
+
     await connectDB();
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`MentorLagbe server running on port ${PORT}`);
     });
+
+    const shutdown = (signal) => {
+      console.log(`${signal} received. Closing server...`);
+
+      server.close(async () => {
+        try {
+          await closeDB();
+        } catch (error) {
+          console.error("Failed to close database cleanly:", error.message);
+        } finally {
+          process.exit(0);
+        }
+      });
+    };
+
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
-    console.error("Failed to connect to MongoDB:", error.message);
+    console.error("Failed to start server:", error.message);
     process.exit(1);
   }
 }
