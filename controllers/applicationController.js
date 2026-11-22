@@ -56,7 +56,7 @@ export const getMyApplications = async (req, res) => {
 // Student: Apply to an Approved Tuition
 export const applyToTuition = async (req, res) => {
   try {
-    const { tuitionId, preferredSchedule, studentNote } = req.body;
+    const { tuitionId, preferredSchedule, studentNote, studentPhone } = req.body;
 
     // Validate Tuition ID
     if (!ObjectId.isValid(tuitionId)) {
@@ -124,7 +124,7 @@ export const applyToTuition = async (req, res) => {
       tutorEmail: tuition.tutorEmail,
       studentName: student.name,
       studentEmail: student.email,
-      studentPhone: student.phone || "",
+      studentPhone: studentPhone?.trim() || student.phone || "",
       preferredSchedule: preferredSchedule.trim(),
       studentNote: studentNote?.trim() || "",
       status: "pending",
