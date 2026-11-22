@@ -158,17 +158,51 @@ const tutors = [
   }
 ];
 
+// Link the public tutor directory to the demo login accounts where names match.
+const accountEmails = {
+  "Sarah Ahmed": "sarah@mentorlagbe.com",
+  "Rahim Hasan": "rahim@mentorlagbe.com",
+  "Nusrat Jahan": "nusrat@mentorlagbe.com",
+  "Sabbir Hossain": "sabbir@mentorlagbe.com",
+  "Ayesha Rahman": "ayesha@mentorlagbe.com",
+  "Tanvir Ahmed": "tanvir@mentorlagbe.com",
+};
+
 async function seedTutors() {
   try {
     await connectDB();
 
     const db = getDB();
 
-    const result = await db
-      .collection("tutors")
-      .insertMany(tutors);
+    const users = db.collection("users");
+    const operations = [];
 
-    console.log(`${result.insertedCount} tutors inserted successfully!`);
+    for (const tutor of tutors) {
+      const email = accountEmails[tutor.name] || "";
+      const user = email
+        ? await users.findOne({ email }, { projection: { _id: 1 } })
+        : null;
+
+      operations.push({
+        updateOne: {
+          filter: { name: tutor.name, subject: tutor.subject },
+          update: {
+            $setOnInsert: tutor,
+            $set: {
+              email,
+              ...(user ? { userId: user._id.toString() } : {}),
+            },
+          },
+          upsert: true,
+        },
+      });
+    }
+
+    const result = await db.collection("tutors").bulkWrite(operations);
+
+    console.log(
+      `${result.upsertedCount} tutors added, ${result.modifiedCount} linked.`
+    );
 
     const total = await db.collection("tutors").countDocuments();
 

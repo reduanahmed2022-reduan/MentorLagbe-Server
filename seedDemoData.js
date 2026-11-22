@@ -5,7 +5,11 @@ import { connectDB, getDB } from "./config/db.js";
 dotenv.config();
 
 const DEMO_PASSWORD = "Tutor@12345";
+const USING_DEFAULT_ADMIN_PASSWORD = !process.env.ADMIN_PASSWORD;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@12345";
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@mentorlagbe.com")
+  .trim()
+  .toLowerCase();
 
 const tutors = [
   { name: "Sarah Ahmed", email: "sarah@mentorlagbe.com", plan: "pro", phone: "+8801711000001", bio: "Mathematics specialist with 8 years of teaching experience." },
@@ -17,26 +21,29 @@ const tutors = [
 ];
 
 const students = [
-  { name: "Student One", email: "student1@mentorlagbe.com" },
-  { name: "Student Two", email: "student2@mentorlagbe.com" },
+  { name: "Student One", email: "student1@mentorlagbe.com", plan: "free", phone: "+8801811000001" },
+  { name: "Student Two", email: "student2@mentorlagbe.com", plan: "free", phone: "+8801811000002" },
 ];
 
 const image = (id) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1200&q=80`;
 
+// 12 approved batches plus two records so the admin moderation queue is demoable.
 const tuitions = [
-  ["Algebra Mastery for HSC", "Mathematics", "HSC", "Online", "Dhaka", 3500, 3, "photo-1509062522246-3755977927d7", "Complete algebra course covering equations, functions and exam practice.", "sarah@mentorlagbe.com"],
-  ["Calculus Foundations", "Mathematics", "University", "Online", "Online", 5000, 2, "photo-1635070041078-e363dbe005cb", "Build a strong calculus foundation with guided problem solving.", "sarah@mentorlagbe.com"],
-  ["IELTS Intensive Batch", "English", "Adult", "Online", "Online", 4500, 4, "photo-1503676260728-1c00da094a0b", "Band 7+ preparation with weekly mock tests and feedback.", "rahim@mentorlagbe.com"],
-  ["Spoken English for Beginners", "English", "SSC", "Offline", "Chattogram", 2500, 2, "photo-1513258496099-48168024aec0", "Conversation-focused classes to speak English confidently.", "rahim@mentorlagbe.com"],
-  ["Physics for Engineering aspirants", "Physics", "HSC", "Online", "Dhaka", 4000, 3, "photo-1636466497217-26a8cbeaf0aa", "Mechanics, electricity and optics with numerical drills.", "nusrat@mentorlagbe.com"],
-  ["Modern Physics Crash Course", "Physics", "University", "Online", "Online", 5500, 2, "photo-1532094349884-543bc11b234d", "Quantum mechanics and relativity explained visually.", "nusrat@mentorlagbe.com"],
-  ["Full-Stack Web Development", "Programming", "Adult", "Online", "Online", 6000, 3, "photo-1498050108023-c5249f4df085", "Learn React, Node.js and MongoDB by building real projects.", "sabbir@mentorlagbe.com"],
-  ["Python for Absolute Beginners", "Programming", "SSC", "Online", "Online", 3000, 2, "photo-1526379095098-d400fd0bf935", "A friendly introduction to programming with Python.", "sabbir@mentorlagbe.com"],
-  ["Biology for Medical Entrance", "Biology", "HSC", "Offline", "Sylhet", 3800, 4, "photo-1530026405186-ed1f139313f8", "Chapter-wise medical entrance preparation with diagrams.", "ayesha@mentorlagbe.com"],
-  ["Genetics & Evolution", "Biology", "University", "Online", "Online", 4200, 2, "photo-1532187863486-abf9dbad1b69", "Understand inheritance, DNA and evolution with examples.", "ayesha@mentorlagbe.com"],
-  ["Organic Chemistry Essentials", "Chemistry", "HSC", "Offline", "Khulna", 3200, 3, "photo-1532634896-26909d0d4b9a", "Reaction mechanisms made easy with practice sheets.", "tanvir@mentorlagbe.com"],
-  ["Chemistry for JEE / Engineering", "Chemistry", "University", "Online", "Online", 4800, 3, "photo-1554475901-4538ddfbccc2", "Structured problem solving for competitive exams.", "tanvir@mentorlagbe.com"],
+  ["Algebra Mastery for HSC", "Mathematics", "HSC", "Online", "Dhaka", 3500, 3, "photo-1509062522246-3755977927d7", "Complete algebra course covering equations, functions and exam practice.", "sarah@mentorlagbe.com", "approved"],
+  ["Calculus Foundations", "Mathematics", "University", "Online", "Online", 5000, 2, "photo-1635070041078-e363dbe005cb", "Build a strong calculus foundation with guided problem solving.", "sarah@mentorlagbe.com", "approved"],
+  ["IELTS Intensive Batch", "English", "Adult", "Online", "Online", 4500, 4, "photo-1503676260728-1c00da094a0b", "Band 7+ preparation with weekly mock tests and feedback.", "rahim@mentorlagbe.com", "approved"],
+  ["Spoken English for Beginners", "English", "SSC", "Offline", "Chattogram", 2500, 2, "photo-1513258496099-48168024aec0", "Conversation-focused classes to speak English confidently.", "rahim@mentorlagbe.com", "approved"],
+  ["Physics for Engineering aspirants", "Physics", "HSC", "Online", "Dhaka", 4000, 3, "photo-1636466497217-26a8cbeaf0aa", "Mechanics, electricity and optics with numerical drills.", "nusrat@mentorlagbe.com", "approved"],
+  ["Modern Physics Crash Course", "Physics", "University", "Online", "Online", 5500, 2, "photo-1532094349884-543bc11b234d", "Quantum mechanics and relativity explained visually.", "nusrat@mentorlagbe.com", "approved"],
+  ["Full-Stack Web Development", "ICT", "Adult", "Online", "Online", 6000, 3, "photo-1498050108023-c5249f4df085", "Learn React, Node.js and MongoDB by building real projects.", "sabbir@mentorlagbe.com", "approved"],
+  ["Python for Absolute Beginners", "ICT", "SSC", "Online", "Online", 3000, 2, "photo-1526379095098-d400fd0bf935", "A friendly introduction to programming with Python.", "sabbir@mentorlagbe.com", "approved"],
+  ["Biology for Medical Entrance", "Biology", "HSC", "Offline", "Sylhet", 3800, 4, "photo-1530026405186-ed1f139313f8", "Chapter-wise medical entrance preparation with diagrams.", "ayesha@mentorlagbe.com", "approved"],
+  ["Genetics & Evolution", "Biology", "University", "Online", "Online", 4200, 2, "photo-1532187863486-abf9dbad1b69", "Understand inheritance, DNA and evolution with examples.", "ayesha@mentorlagbe.com", "approved"],
+  ["Organic Chemistry Essentials", "Chemistry", "HSC", "Offline", "Khulna", 3200, 3, "photo-1532634896-26909d0d4b9a", "Reaction mechanisms made easy with practice sheets.", "tanvir@mentorlagbe.com", "approved"],
+  ["Chemistry for JEE / Engineering", "Chemistry", "University", "Online", "Online", 4800, 3, "photo-1554475901-4538ddfbccc2", "Structured problem solving for competitive exams.", "tanvir@mentorlagbe.com", "approved"],
+  ["Business Statistics for Beginners", "Mathematics", "Adult", "Online", "Online", 3600, 2, "photo-1551288049-bebda4e38f71", "Practical statistics for everyday business decisions.", "sarah@mentorlagbe.com", "pending"],
+  ["Data Science Bootcamp", "ICT", "Adult", "Online", "Online", 6500, 3, "photo-1551288049-bebda4e38f71", "An intensive introduction to data analysis with Python.", "sabbir@mentorlagbe.com", "rejected"],
 ];
 
 async function upsertUser(users, user, role, password, extra = {}) {
@@ -51,6 +58,7 @@ async function upsertUser(users, user, role, password, extra = {}) {
         phone: user.phone || "",
         bio: user.bio || "",
         plan: user.plan || "free",
+        profileImage: "",
         image: "",
         createdAt: new Date(),
         ...extra,
@@ -65,14 +73,15 @@ async function seed() {
 
   const db = getDB();
   const users = db.collection("users");
-  const tuitions = db.collection("tuitions");
+  const tuitionsCollection = db.collection("tuitions");
   const applications = db.collection("applications");
+  const payments = db.collection("payments");
 
   await upsertUser(
     users,
     {
       name: process.env.ADMIN_NAME || "MentorLagbe Admin",
-      email: process.env.ADMIN_EMAIL || "admin@mentorlagbe.com",
+      email: ADMIN_EMAIL,
     },
     "admin",
     ADMIN_PASSWORD
@@ -100,6 +109,7 @@ async function seed() {
     photoId,
     description,
     tutorEmail,
+    approvalStatus = "approved",
   ] of tuitions) {
     const tutor = tutors.find((item) => item.email === tutorEmail);
     const document = {
@@ -114,18 +124,18 @@ async function seed() {
       description,
       tutorName: tutor.name,
       tutorEmail,
-      approvalStatus: "approved",
+      approvalStatus,
       isActive: true,
       createdAt: new Date(now - insertedTuitions.length * 86400000),
     };
 
-    await tuitions.updateOne(
+    await tuitionsCollection.updateOne(
       { title, tutorEmail },
       { $setOnInsert: document },
       { upsert: true }
     );
 
-    const saved = await tuitions.findOne({ title, tutorEmail });
+    const saved = await tuitionsCollection.findOne({ title, tutorEmail });
     insertedTuitions.push(saved);
   }
 
@@ -155,21 +165,57 @@ async function seed() {
           tutorEmail: tuition.tutorEmail,
           studentName: student.name,
           studentEmail: student.email,
-          studentPhone: "+8801811000001",
+          studentPhone: student.phone,
           preferredSchedule: schedule,
           studentNote: note,
           status,
           appliedAt: new Date(now - tuitionIndex * 3600000),
+          ...(status !== "pending" && {
+            reviewedAt: new Date(now - tuitionIndex * 1800000),
+          }),
         },
       },
       { upsert: true }
     );
   }
 
-  console.log("Seed completed: admin, tutors, students, 12 tuitions and sample applications.");
-  console.log(`Admin login: ${process.env.ADMIN_EMAIL || "admin@mentorlagbe.com"} / ${ADMIN_PASSWORD}`);
+  // Demo transactions so the admin revenue and transactions views are populated.
+  const demoPayments = [
+    ["sarah@mentorlagbe.com", "Sarah Ahmed", "tutor", "Pro Tutor Plan", 15, "cs_demo_tutor_sarah"],
+    ["nusrat@mentorlagbe.com", "Nusrat Jahan", "tutor", "Pro Tutor Plan", 15, "cs_demo_tutor_nusrat"],
+    ["ayesha@mentorlagbe.com", "Ayesha Rahman", "tutor", "Pro Tutor Plan", 15, "cs_demo_tutor_ayesha"],
+  ];
+
+  for (const [index, [userEmail, userName, userRole, planName, amount, stripeSessionId]] of demoPayments.entries()) {
+    await payments.updateOne(
+      { stripeSessionId },
+      {
+        $setOnInsert: {
+          userEmail,
+          userName,
+          userRole,
+          planName,
+          amount,
+          currency: "USD",
+          transactionId: `pi_demo_${stripeSessionId}`,
+          stripeSessionId,
+          paymentStatus: "paid",
+          paidAt: new Date(now - index * 86400000),
+        },
+      },
+      { upsert: true }
+    );
+  }
+
+  console.log("Seed completed: admin, 6 tutors, 2 students, 12 approved tuitions, 2 moderation records, 5 applications and demo payments.");
+  if (USING_DEFAULT_ADMIN_PASSWORD) {
+    console.log(`Admin login: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+  } else {
+    console.log(`Admin login: ${ADMIN_EMAIL} / password is set in server .env / host environment variables`);
+  }
   console.log(`Tutor login: ${tutors[0].email} / ${DEMO_PASSWORD}`);
-};
+  console.log(`Student login: ${students[0].email} / ${DEMO_PASSWORD}`);
+}
 
 seed()
   .catch((error) => {

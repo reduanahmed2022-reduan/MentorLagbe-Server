@@ -48,6 +48,7 @@ const seedAdmin = async () => {
     console.log("Admin account created successfully.");
   } catch (error) {
     console.error("Admin seed failed:", error.message);
+    process.exitCode = 1;
   } finally {
     process.exit();
   }
