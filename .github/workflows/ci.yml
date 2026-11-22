@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+      - name: Check JavaScript syntax
+        run: |
+          set -euo pipefail
+          node --check index.js
+          find . -type f -name '*.js' -not -path '*/node_modules/*' -print0 |
+            while IFS= read -r -d '' file; do
+              node --check "$file"
+            done
