@@ -6,26 +6,67 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+ const DEFAULT_LIMIT = 12;
+ const MAX_LIMIT = 50;
+
+ // Normalize a user-supplied limit into a finite integer in 1..50.
+ // Repeated query keys yield arrays, and values like "abc"/Infinity yield
+ // NaN/Infinity. Those must fall back to a bounded default rather than
+ // skipping the cap and returning an unbounded result set.
+ const normalizeLimit = (value, fallback = DEFAULT_LIMIT) => {
+   if (Array.isArray(value) || value === undefined || value === null) {
+     return fallback;
+   }
+
+   if (typeof value === "string" && value.trim() === "") {
+     return fallback;
+   }
+
+   const parsed = Number(value);
+
+   if (!Number.isFinite(parsed)) {
+     return fallback;
+   }
+
+   return Math.min(MAX_LIMIT, Math.max(1, Math.floor(parsed)));
+ };
+
  // GET: Search, filter and sort tutors
 router.get("/", async (req, res) => {
   try {
     const db = getDB();
 
     const {
+      search,
       subject,
       location,
       mode,
       minRate,
       maxRate,
       sort,
+      limit,
     } = req.query;
 
     const query = {};
 
-    // Search by subject
+    // Free-text search across the fields shown on tutor cards.
+    if (search && String(search).trim()) {
+      const term = escapeRegex(String(search).trim());
+
+      query.$or = [
+        { name: { $regex: term, $options: "i" } },
+        { subject: { $regex: term, $options: "i" } },
+        { qualification: { $regex: term, $options: "i" } },
+      ];
+    }
+
+    // Exact subject filter from the dropdown.
     if (subject) {
       query.subject = {
-        $regex: String(subject),
+        $regex: `^${escapeRegex(String(subject))}$`,
         $options: "i",
       };
     }
@@ -33,7 +74,7 @@ router.get("/", async (req, res) => {
     // Filter by location
     if (location) {
       query.location = {
-        $regex: String(location),
+        $regex: escapeRegex(String(location)),
         $options: "i",
       };
     }
@@ -41,7 +82,7 @@ router.get("/", async (req, res) => {
     // Filter by teaching mode
     if (mode) {
       query.mode = {
-        $regex: String(mode),
+        $regex: escapeRegex(String(mode)),
         $options: "i",
       };
     }
@@ -72,11 +113,16 @@ router.get("/", async (req, res) => {
       sortOption = { createdAt: -1 };
     }
 
-    const tutors = await db
-      .collection("tutors")
-      .find(query)
-      .sort(sortOption)
-      .toArray();
+    const tutorsCollection = db.collection("tutors");
+    const total = await tutorsCollection.countDocuments(query);
+
+    let cursor = tutorsCollection.find(query).sort(sortOption);
+
+    if (limit !== undefined) {
+      cursor = cursor.limit(normalizeLimit(limit));
+    }
+
+    const tutors = await cursor.toArray();
 
     const formattedTutors = tutors.map((tutor) => ({
       ...tutor,
@@ -86,7 +132,7 @@ router.get("/", async (req, res) => {
 
     res.status(200).json({
       success: true,
-      total: formattedTutors.length,
+      total,
       tutors: formattedTutors,
     });
   } catch (error) {

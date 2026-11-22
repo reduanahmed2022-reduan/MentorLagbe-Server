@@ -85,6 +85,7 @@ export const registerUser = async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
+        plan: newUser.plan || "free",
       },
     });
   } catch (error) {
@@ -161,6 +162,8 @@ export const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        plan: user.plan || "free",
+        image: user.profileImage || "",
       },
     });
   } catch (error) {

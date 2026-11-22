@@ -142,6 +142,13 @@ export const applyToTuition = async (req, res) => {
   } catch (error) {
     console.error("Apply to Tuition Error:", error);
 
+    if (error?.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "You have already applied to this tuition",
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: "Failed to submit application",

@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/db.js";
+import { PRO_PLANS } from "../config/stripe.js";
 
 /**
  * Records a paid Stripe session in `payments` and upgrades the matching user
@@ -16,15 +17,10 @@ export async function activateSubscription(session) {
   const users = db.collection("users");
   const metadata = session.metadata || {};
 
-  const existing = await payments.findOne({ stripeSessionId: session.id });
-
-  if (existing) {
-    return { activated: false, reason: "already_recorded", plan: "pro" };
-  }
-
-  const userFilter = metadata.userId && ObjectId.isValid(metadata.userId)
-    ? { _id: new ObjectId(metadata.userId) }
-    : { email: metadata.userEmail || session.customer_details?.email };
+  const userFilter =
+    metadata.userId && ObjectId.isValid(metadata.userId)
+      ? { _id: new ObjectId(metadata.userId) }
+      : { email: metadata.userEmail || session.customer_details?.email };
 
   const user = await users.findOne(userFilter, {
     projection: { password: 0 },
@@ -32,6 +28,17 @@ export async function activateSubscription(session) {
 
   if (!user) {
     return { activated: false, reason: "user_not_found" };
+  }
+
+  const plan = PRO_PLANS[user.role];
+  const expectedAmount = plan?.amount;
+
+  if (
+    expectedAmount &&
+    (session.amount_total !== expectedAmount ||
+      (session.currency || "").toLowerCase() !== plan.currency)
+  ) {
+    return { activated: false, reason: "invalid_amount" };
   }
 
   const payment = {
@@ -50,12 +57,38 @@ export async function activateSubscription(session) {
     paidAt: new Date(),
   };
 
-  await payments.insertOne(payment);
+  const markPro = () =>
+    users.updateOne(
+      { _id: user._id },
+      { $set: { plan: "pro", updatedAt: new Date() } }
+    );
 
-  await users.updateOne(
-    { _id: user._id },
-    { $set: { plan: "pro", updatedAt: new Date() } }
-  );
+  try {
+    // The unique index on stripeSessionId makes this claim atomic, so the
+    // webhook and the success page can never insert the same payment twice.
+    const claim = await payments.updateOne(
+      { stripeSessionId: session.id },
+      { $setOnInsert: payment },
+      { upsert: true }
+    );
+
+    if (claim.upsertedCount === 0) {
+      // Still heal the user record in case a previous run failed after insert.
+      await markPro();
+
+      return { activated: false, reason: "already_recorded", plan: "pro" };
+    }
+  } catch (error) {
+    if (error.code === 11000) {
+      await markPro();
+
+      return { activated: false, reason: "already_recorded", plan: "pro" };
+    }
+
+    throw error;
+  }
+
+  await markPro();
 
   return { activated: true, plan: "pro", payment };
 }

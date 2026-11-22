@@ -58,7 +58,8 @@ export const updateUserRole = async (req, res) => {
 
     const db = getDB();
     const users = db.collection("users");
-    const user = await users.findOne({ _id: new ObjectId(id) });
+    const targetId = new ObjectId(id);
+    const user = await users.findOne({ _id: targetId });
 
     if (!user) {
       return res.status(404).json({
@@ -68,18 +69,30 @@ export const updateUserRole = async (req, res) => {
     }
 
     // An admin must not be able to lock themselves out of the admin area.
-    if (id === req.user.userId && user.role === "admin" && role !== "admin") {
+    // Compare canonical ObjectIds so uppercase hex cannot bypass this guard.
+    if (
+      targetId.equals(new ObjectId(req.user.userId)) &&
+      user.role === "admin" &&
+      role !== "admin"
+    ) {
       return res.status(400).json({
         success: false,
         message: "You cannot change your own admin role",
       });
     }
 
-    // Always keep at least one admin in the system.
-    if (user.role === "admin" && role !== "admin") {
-      const adminCount = await users.countDocuments({ role: "admin" });
+    const isAdminDemotion = user.role === "admin" && role !== "admin";
 
-      if (adminCount <= 1) {
+    // Count admins excluding the target: only demote if >= 1 other admin remains.
+    // Update pipelines cannot read sibling docs, so this re-check + the CAS filter
+    // below is the strongest available guard; mutual concurrent demotions can still race.
+    if (isAdminDemotion) {
+      const remainingAdmins = await users.countDocuments({
+        role: "admin",
+        _id: { $ne: targetId },
+      });
+
+      if (remainingAdmins < 1) {
         return res.status(400).json({
           success: false,
           message: "At least one admin must remain",
@@ -95,15 +108,32 @@ export const updateUserRole = async (req, res) => {
       });
     }
 
-    await users.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { role, updatedAt: new Date() } }
-    );
+    // CAS: a demotion only applies if the user is still an admin.
+    const updateFilter = isAdminDemotion
+      ? { _id: targetId, role: "admin" }
+      : { _id: targetId };
+
+    const result = await users.updateOne(updateFilter, {
+      $set: { role, updatedAt: new Date() },
+    });
+
+    if (isAdminDemotion && result.matchedCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one admin must remain",
+      });
+    }
 
     return res.status(200).json({
       success: true,
       message: `User role updated to ${role}`,
-      user: { id, name: user.name, email: user.email, role },
+      user: {
+        _id: user._id.toString(),
+        id: user._id.toString(),
+        name: user.name,
+        email: user.email,
+        role,
+      },
     });
   } catch (error) {
     console.error("Update User Role Error:", error);

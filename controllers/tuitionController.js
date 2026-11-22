@@ -462,6 +462,32 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/db.js";
 
+const DEFAULT_LIMIT = 12;
+const MAX_LIMIT = 50;
+const DEFAULT_PUBLIC_LIMIT = 50;
+
+// Normalize a user-supplied limit into a finite integer in 1..50.
+// Arrays (repeated query keys), non-numeric strings, Infinity and empty
+// values all fall back to a bounded default so no path can return an
+// unbounded result set.
+const normalizeLimit = (value, fallback = DEFAULT_LIMIT) => {
+  if (Array.isArray(value) || value === undefined || value === null) {
+    return fallback;
+  }
+
+  if (typeof value === "string" && value.trim() === "") {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(MAX_LIMIT, Math.max(1, Math.floor(parsed)));
+};
+
 // Create Tuition Request (Tutor)
 export const createTuition = async (req, res) => {
   try {
@@ -718,17 +744,26 @@ export const getAllTuitions = async (req, res) => {
       }
     }
 
-    // Optional server-side pagination (default: all results for existing clients).
+    // Optional server-side pagination. Each parameter falls back independently
+    // so `?limit=6` (home sections) and `?page=2` both work as expected.
     const hasPagination = page !== undefined || limit !== undefined;
-    const pageNumber = Math.max(1, Number(page) || 1);
-    const pageSize = Math.min(50, Math.max(1, Number(limit) || 12));
 
-    if (hasPagination && (!Number.isFinite(Number(page)) || !Number.isFinite(Number(limit)))) {
+    if (
+      (page !== undefined && !Number.isFinite(Number(page))) ||
+      (limit !== undefined && !Number.isFinite(Number(limit)))
+    ) {
       return res.status(400).json({
         success: false,
         message: "page and limit must be numbers",
       });
     }
+
+    const pageNumber = Math.max(1, Math.floor(Number(page) || 1));
+    // Bounded in every case: paginated requests use the normalized page size,
+    // while unpaginated public requests get a sane default cap.
+    const pageSize = hasPagination
+      ? normalizeLimit(limit)
+      : DEFAULT_PUBLIC_LIMIT;
 
     const tuitionsCollection = db.collection("tuitions");
     const total = await tuitionsCollection.countDocuments(filter);
@@ -736,8 +771,9 @@ export const getAllTuitions = async (req, res) => {
     const query = tuitionsCollection.find(filter).sort({ createdAt: -1 });
 
     if (hasPagination) {
-      query.skip((pageNumber - 1) * pageSize).limit(pageSize);
+      query.skip((pageNumber - 1) * pageSize);
     }
+    query.limit(pageSize);
 
     const tuitions = await query.toArray();
 
@@ -968,23 +1004,52 @@ export const updateMyTuition = async (req, res) => {
       });
     }
 
-    // Update Only Own Tuition
+    // Use the same ownership filter for the read and the write so a tutor can
+    // only inspect and modify their own tuition.
+    const tuitionFilter = {
+      _id: new ObjectId(id),
+      tutorEmail: tutor.email,
+    };
+
+    const tuition = await db.collection("tuitions").findOne(tuitionFilter);
+
+    if (!tuition) {
+      return res.status(404).json({
+        success: false,
+        message: "Tuition not found or access denied",
+      });
+    }
+
+    const updatedValues = {
+      title: title.trim(),
+      subject: subject.trim(),
+      classLevel: classLevel.trim(),
+      mode,
+      location: location.trim(),
+      monthlyFee: fee,
+      daysPerWeek: days,
+      description: description.trim(),
+      ...(bannerImage !== undefined && { bannerImage }),
+    };
+
+    // Editing material content of an approved post must send it back through
+    // moderation instead of leaving an unreviewed edit live.
+    const materialFieldsChanged = Object.entries(updatedValues).some(
+      ([field, value]) => String(tuition[field] ?? "") !== String(value)
+    );
+
+    const requiresReview =
+      materialFieldsChanged && tuition.approvalStatus === "approved";
+
     const result = await db.collection("tuitions").updateOne(
-      {
-        _id: new ObjectId(id),
-        tutorEmail: tutor.email,
-      },
+      tuitionFilter,
       {
         $set: {
-          title: title.trim(),
-          subject: subject.trim(),
-          classLevel: classLevel.trim(),
-          mode,
-          location: location.trim(),
-          monthlyFee: fee,
-          daysPerWeek: days,
-          description: description.trim(),
-          ...(bannerImage !== undefined && { bannerImage }),
+          ...updatedValues,
+          ...(requiresReview && {
+            approvalStatus: "pending",
+            isActive: false,
+          }),
           updatedAt: new Date(),
         },
       }

@@ -46,6 +46,13 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
+    if (user.plan === "pro") {
+      return res.status(400).json({
+        success: false,
+        message: "Your Pro plan is already active",
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: user.email,
@@ -128,7 +135,9 @@ export const verifyCheckoutSession = async (req, res) => {
       message:
         result.reason === "payment_not_paid"
           ? "Payment is not completed yet"
-          : "Your Pro plan is active",
+          : result.reason === "invalid_amount"
+            ? "Payment amount did not match the selected plan"
+            : "Your Pro plan is active",
     });
   } catch (error) {
     console.error("Verify Checkout Session Error:", error);
@@ -171,7 +180,7 @@ export const handleStripeWebhook = async (req, res) => {
 
     return res.status(400).json({
       success: false,
-      message: `Webhook signature verification failed: ${error.message}`,
+      message: "Invalid webhook signature",
     });
   }
 
