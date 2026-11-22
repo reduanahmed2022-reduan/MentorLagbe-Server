@@ -1,9 +1,19 @@
 # MentorLagbe API (Server)
 
-REST API for **MentorLagbe**, a tutor–student marketplace. It handles JWT authentication, tutor tuition posts with admin approval, student applications, Stripe Checkout for Pro plans, ImgBB image uploads, and admin stats/user-role management.
+REST API for **MentorLagbe**, a tutor–student marketplace. It handles authentication (BetterAuth with the MongoDB adapter, plus JWT bearer tokens for protected REST APIs), tutor tuition posts with admin approval, student applications, Stripe Checkout for Pro plans, ImgBB image uploads, and admin stats/user-role management.
 
 **Local base URL:** `http://localhost:5000`  
 **Live API (placeholder):** `https://<your-api-host>`
+
+## Key Features
+
+- **Authentication and roles:** BetterAuth with the MongoDB adapter plus JWT bearer-token REST auth for student, tutor, and admin accounts.
+- **Tuition marketplace:** public tutor/tuition browsing with search, filters, sorting, and detail endpoints.
+- **Moderation workflow:** tutors create and manage tuition posts; admins review, approve, or reject them.
+- **Applications:** students apply to tuitions and track status; tutors list applicants and accept/reject them.
+- **Payments:** Stripe Checkout for Pro plans with signed webhooks and success-page verification.
+- **Image uploads:** ImgBB-backed image upload with signature checks and a 5 MB in-memory limit.
+- **Admin tools:** dashboard stats, user role management, and moderation queues.
 
 ---
 
@@ -12,7 +22,7 @@ REST API for **MentorLagbe**, a tutor–student marketplace. It handles JWT auth
 - **Runtime:** Node.js (ES modules — `"type": "module"` in `package.json`)
 - **Framework:** Express 5
 - **Database:** MongoDB native driver (no Mongoose); database name `MantorLagbe`
-- **Auth:** `jsonwebtoken` (JWT bearer tokens) + `bcryptjs` (password hashing)
+- **Auth:** BetterAuth (`better-auth`) with the MongoDB adapter (`@better-auth/mongo-adapter`) as part of the stack; `jsonwebtoken` (JWT bearer tokens) + `bcryptjs` (password hashing) for protected REST APIs
 - **Payments:** `stripe` (Stripe Checkout + signed webhooks)
 - **Uploads:** `multer` (in-memory, 5 MB limit) → ImgBB
 - **Middleware:** `cors`, `dotenv`
@@ -32,7 +42,7 @@ REST API for **MentorLagbe**, a tutor–student marketplace. It handles JWT auth
 | `multer` | `^2.5.0` |
 | `stripe` | `^23.2.0` |
 
-> Note: the `dev` script uses Node's built-in `node --watch`. **Nodemon is not a dependency** in this repo, so no `nodemon` install/config is required. `better-auth` and `@better-auth/mongo-adapter` are listed in `package.json`; the REST auth implemented here uses JWT + bcryptjs.
+> Note: the `dev` script uses Node's built-in `node --watch`. **Nodemon is not a dependency** in this repo, so no `nodemon` install/config is required. BetterAuth (`better-auth`) is configured with the MongoDB adapter (`@better-auth/mongo-adapter`) as part of the auth stack; JWT bearer tokens remain the mechanism used by the protected REST API endpoints below.
 
 ---
 
@@ -54,7 +64,7 @@ copy .env.example .env
 cp .env.example .env
 ```
 
-Fill in the values (see table below). Only `MONGODB_URI` and `JWT_SECRET` are **required to boot** (the server exits without them). `CLIENT_URL`, Stripe, and ImgBB are optional/feature-specific, but set `CLIENT_URL` and the keys for features you use in production.
+Fill in the values (see table below). Only `MONGODB_URI` and `JWT_SECRET` are **required to boot** (the server exits without them). `CLIENT_URL`, Stripe, and ImgBB are optional/feature-specific, but set `CLIENT_URL`, the BetterAuth variables (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`), and the keys for features you use in production. The pre-deploy env check (`node scripts/verify-env.mjs`) also expects the BetterAuth variables.
 
 ### 3. Run the server
 
@@ -86,7 +96,7 @@ npm run seed:tutors   # node seedTutors.js
 
 ## Environment Variables
 
-Every variable in `.env.example` (see DEPLOYMENT.md for a "Required to boot" vs "Optional / feature-specific" breakdown):
+Every variable in `.env.example` (see DEPLOYMENT.md for "Required to boot", "Required by deployment preflight", and "Optional / feature-specific" breakdowns):
 
 | Variable | Purpose |
 | --- | --- |
@@ -94,15 +104,18 @@ Every variable in `.env.example` (see DEPLOYMENT.md for a "Required to boot" vs 
 | `MONGODB_URI` | MongoDB connection string (Atlas or local). Required — the app throws at import if missing. |
 | `JWT_SECRET` | Secret used to sign and verify access tokens. Required at startup. |
 | `JWT_EXPIRES_IN` | JWT lifetime, e.g. `7d`; defaults to `7d`. |
+| `BETTER_AUTH_SECRET` | Secret used by BetterAuth; set a long random value. Server-only — never expose it in the client project. Required by `scripts/verify-env.mjs`. |
+| `BETTER_AUTH_URL` | The **API origin** BetterAuth uses for callbacks (not the client origin); local placeholder `http://localhost:5000`. Client endpoint = `${NEXT_PUBLIC_API_URL}/better-auth`. Required by `scripts/verify-env.mjs`. |
 | `CLIENT_URL` | Comma-separated allowed CORS origins, also the base URL for Stripe success/cancel redirects. |
 | `STRIPE_SECRET_KEY` | Stripe secret key for Checkout sessions; payment endpoints return `503` if unset. |
 | `STRIPE_WEBHOOK_SECRET` | Stripe endpoint signing secret used to verify webhook signatures. |
 | `IMGBB_API_KEY` | ImgBB API key for image uploads; `/api/upload/image` returns `503` if unset. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Server-only Google OAuth keys. Without both, Google sign-in is disabled and `/api/auth/google/status` returns `enabled:false`. Never add `NEXT_PUBLIC_GOOGLE_*` to the client. |
 | `ADMIN_EMAIL` | Email used by `npm run seed` for the admin account (default `admin@mentorlagbe.com`). |
 | `ADMIN_PASSWORD` | Password used by `npm run seed` for the admin account (default `Admin@12345`). |
 | `ADMIN_NAME` | Display name used by `npm run seed` for the admin account (default `MentorLagbe Admin`). |
 
-Notes: `MONGODB_URI` and `JWT_SECRET` are boot-blocking; missing Stripe/ImgBB keys only make those features return `503`; `JWT_EXPIRES_IN` and `ADMIN_NAME` are optional with defaults. The `ADMIN_*` variables are seed-only — `npm run seed` falls back to the defaults above when they are absent, but `npm run seed:admin` requires `ADMIN_EMAIL` and `ADMIN_PASSWORD`. `Admin@12345` is the documented demo default only — **change it in production**. Re-running a seed after changing `ADMIN_PASSWORD` will not rotate an existing admin's password.
+Notes: `MONGODB_URI` and `JWT_SECRET` are boot-blocking; the BetterAuth MongoDB adapter uses the same `MONGODB_URI` connection. `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` are required by the pre-deploy env check; without the secret `/api/better-auth` is disabled while the legacy JWT API still boots. `BETTER_AUTH_URL` is the API origin, not the client origin. Missing Stripe/ImgBB keys only make those features return `503`; `JWT_EXPIRES_IN` and `ADMIN_NAME` are optional with defaults. The `ADMIN_*` variables are seed-only — `npm run seed` falls back to the defaults above when they are absent, but `npm run seed:admin` requires `ADMIN_EMAIL` and `ADMIN_PASSWORD`. `Admin@12345` is the documented demo default only — **change it in production**. Re-running a seed after changing `ADMIN_PASSWORD` will not rotate an existing admin's password.
 
 Example:
 
@@ -111,6 +124,8 @@ PORT=5000
 MONGODB_URI=your_mongodb_atlas_connection_string
 JWT_SECRET=replace_with_a_long_random_secret
 JWT_EXPIRES_IN=7d
+BETTER_AUTH_SECRET=replace_with_a_long_random_secret
+BETTER_AUTH_URL=http://localhost:5000
 CLIENT_URL=http://localhost:3000
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
@@ -124,7 +139,11 @@ ADMIN_NAME=MentorLagbe Admin
 
 ## Authentication
 
-Protected routes expect:
+BetterAuth (`better-auth`) is part of the server's auth stack, configured with the MongoDB adapter (`@better-auth/mongo-adapter`) to persist auth data in MongoDB through the same `MONGODB_URI`; it is configured with `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`. The Next.js client's BetterAuth client targets the API's `/api/better-auth` path. In parallel, JWT bearer tokens continue to protect the REST API endpoints documented below.
+
+When `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, Google OAuth is enabled. Register the redirect URI `${BETTER_AUTH_URL}/api/better-auth/callback/google` in Google Console. `GET /api/auth/google/status` exposes only `enabled`, and `GET /api/auth/google/callback` converts the BetterAuth session into the same legacy JWT/localStorage contract used by email login. Google keys stay server-only.
+
+Protected REST routes expect:
 
 ```http
 Authorization: Bearer <jwt_token>
@@ -258,7 +277,8 @@ The seed also inserts 12 approved tuitions across Mathematics, English, Physics,
 
 - **CORS** is driven by `CLIENT_URL`, split on commas and trimmed. Requests without an `Origin` header (server-to-server, health checks) are allowed; disallowed origins receive `403`. Credentials are enabled.
 - **Stripe webhook raw body:** `webhookRoutes` is mounted on `/api/payments` **before** `express.json()`, and uses `express.raw({ type: "application/json" })`. Do not move it after the JSON parser or signature verification will fail.
-- **JWT secret is required at startup:** if `JWT_SECRET` is missing, the server logs the error and exits. Tokens are signed with `JWT_EXPIRES_IN` (default `7d`) and verified via `Authorization: Bearer <token>`.
+- **BetterAuth:** configured with the MongoDB adapter (`@better-auth/mongo-adapter`) as part of the auth stack, backed by the same MongoDB connection (`MONGODB_URI`).
+- **JWT secret is required at startup:** if `JWT_SECRET` is missing, the server logs the error and exits. Tokens are signed with `JWT_EXPIRES_IN` (default `7d`) and verified via `Authorization: Bearer <token>` on protected REST routes.
 - **Transactions:** paid Stripe sessions are recorded in the `payments` collection with user, plan, amount, currency, `transactionId`, `stripeSessionId`, and `paidAt`. Activation is idempotent by `stripeSessionId` (webhook + success-page verify are both safe), and the user's `plan` is set to `pro`. Admins read these via `/api/admin/transactions`.
 - **Database:** the code connects to the database named `MantorLagbe` (spelling as in `config/db.js`) and uses collections `users`, `tutors`, `tuitions`, `applications`, and `payments`.
 - **Errors:** CORS, malformed JSON, multer, and unexpected errors are normalized to JSON responses by centralized handlers.
@@ -278,6 +298,7 @@ The seed also inserts 12 approved tuitions across Mathematics, English, Physics,
 7. Set `PORT` (or let the host inject it) and start with `npm start`.
 8. Point an uptime monitor at `GET /health` (or the placeholder live URL `https://<your-api-host>/health`).
 9. Re-run `npm run seed` only if you want the demo accounts/data in that environment (remember it will not overwrite existing users).
+10. Set `BETTER_AUTH_SECRET` (a long random secret) and `BETTER_AUTH_URL` for BetterAuth, then confirm with `node scripts/verify-env.mjs`.
 
 ### Environment variables (exact keys)
 
@@ -289,6 +310,8 @@ Set these in the hosting platform's environment/secret store (or in `.env` local
 | `MONGODB_URI` | MongoDB Atlas connection string. **Required** — the app throws at import if missing. |
 | `JWT_SECRET` | JWT signing secret. **Required** — the server exits at startup if missing. |
 | `JWT_EXPIRES_IN` | Token lifetime, e.g. `7d`; defaults to `7d`. |
+| `BETTER_AUTH_SECRET` | Long random secret used by BetterAuth; expected by `node scripts/verify-env.mjs`. |
+| `BETTER_AUTH_URL` | API origin BetterAuth uses for callbacks (placeholder in `.env.example`: `http://localhost:5000`); expected by `node scripts/verify-env.mjs`. |
 | `CLIENT_URL` | Comma-separated allowed CORS origins. Stripe Checkout success/cancel redirects use the **first** origin only — list the primary client first. |
 | `STRIPE_SECRET_KEY` | Stripe secret key; payment endpoints return `503` if unset. |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for the Stripe webhook endpoint. |

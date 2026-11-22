@@ -12,11 +12,21 @@ import applicationRoutes from "./routes/applicationRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import { toNodeHandler } from "better-auth/node";
+import {
+  BETTER_AUTH_BASE_PATH,
+  getAuth,
+  isBetterAuthConfigured,
+} from "./config/betterAuth.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// The BetterAuth instance needs a connected DB, so its handler is installed in
+// startServer() before listen(). No request can arrive before that point.
+let betterAuthHandler = null;
 
 // Middleware
 const allowedOrigins = CLIENT_ORIGINS;
@@ -37,6 +47,15 @@ app.use(
 
 // Stripe webhook must receive the raw body for signature verification.
 app.use("/api/payments", webhookRoutes);
+
+// BetterAuth is isolated on /api/better-auth; the legacy JWT router below is
+// untouched. Mount before express.json() so the node handler sees the raw
+// stream, and before the /api 404 catch-all. No req.url rewriting: better-call
+// reconstructs the URL from req.baseUrl + req.originalUrl.
+app.use(BETTER_AUTH_BASE_PATH, (req, res, next) => {
+  if (!betterAuthHandler) return next();
+  return betterAuthHandler(req, res);
+});
 
 app.use(express.json());
 
@@ -84,6 +103,9 @@ app.use("/api", (req, res) => {
 
 // Centralized error handler (CORS, malformed JSON, unexpected errors).
 app.use((error, req, res, next) => {
+  // BetterAuth streams its responses; never try to write a second response.
+  if (res.headersSent) return next(error);
+
   console.error("Request Error:", error.message);
 
   if (error.message === "Not allowed by CORS") {
@@ -100,6 +122,13 @@ app.use((error, req, res, next) => {
     });
   }
 
+  if (error.type === "entity.too.large") {
+    return res.status(413).json({
+      success: false,
+      message: "Payload too large",
+    });
+  }
+
   return res.status(500).json({
     success: false,
     message: "Something went wrong on the server",
@@ -111,6 +140,13 @@ async function startServer() {
   try {
     if (!process.env.JWT_SECRET) {
       throw new Error("JWT_SECRET is missing from .env file");
+    }
+
+    if (isBetterAuthConfigured() && !process.env.BETTER_AUTH_URL) {
+      console.warn("Warning: BETTER_AUTH_URL is not set; using the local API origin.");
+    }
+    if (!isBetterAuthConfigured()) {
+      console.warn("Warning: BETTER_AUTH_SECRET is not set; /api/better-auth is disabled.");
     }
 
     if (process.env.NODE_ENV === "production") {
@@ -131,26 +167,40 @@ async function startServer() {
 
     await connectDB();
 
+    if (isBetterAuthConfigured()) {
+      betterAuthHandler = toNodeHandler(await getAuth());
+      console.log(`BetterAuth mounted at ${BETTER_AUTH_BASE_PATH}`);
+    }
+
     const server = app.listen(PORT, () => {
       console.log(`MentorLagbe server running on port ${PORT}`);
     });
 
+    let shuttingDown = false;
+
     const shutdown = (signal) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+
       console.log(`${signal} received. Closing server...`);
 
-      server.close(async () => {
+      server.close(async (error) => {
+        if (error && error.code !== "ERR_SERVER_NOT_RUNNING") {
+          console.error("Server close error:", error.message);
+        }
+
         try {
           await closeDB();
-        } catch (error) {
-          console.error("Failed to close database cleanly:", error.message);
+        } catch (closeError) {
+          console.error("Failed to close database cleanly:", closeError.message);
         } finally {
           process.exit(0);
         }
       });
     };
 
-    process.on("SIGTERM", () => shutdown("SIGTERM"));
-    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.once("SIGTERM", () => shutdown("SIGTERM"));
+    process.once("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
     console.error("Failed to start server:", error.message);
     process.exit(1);

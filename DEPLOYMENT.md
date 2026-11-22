@@ -6,7 +6,7 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 
 - Build: `npm install`. Start: `npm start` (`node index.js`). Node **>= 20.19.0**.
 - `PORT` is injected by the host; the app falls back to `5000`.
-- Set the environment variables below. They are **not** all equally critical: only two are required to boot, while the rest are optional or enable a specific feature.
+- Set the environment variables below. `MONGODB_URI` and `JWT_SECRET` are boot-blocking; the two BetterAuth variables are required by the pre-deploy preflight (`node scripts/verify-env.mjs`). Everything else is optional or feature-specific.
 
 ### Required to boot
 
@@ -14,6 +14,15 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 | --- | --- | --- |
 | `MONGODB_URI` | `mongodb+srv://<user>:<pass>@<cluster>/<db>` | Boot-blocking: `config/db.js` throws at import. Set the production Atlas connection string. |
 | `JWT_SECRET` | `<long-random-secret>` | Boot-blocking: `index.js` throws and the server exits at startup. Generate a long random value. |
+
+### Required by deployment preflight
+
+`node scripts/verify-env.mjs` also requires these two **server-only** variables. Only a missing `BETTER_AUTH_SECRET` disables `/api/better-auth`; a missing `BETTER_AUTH_URL` falls back to the local API origin. The legacy JWT API still boots either way.
+
+| Variable | Example | Notes |
+| --- | --- | --- |
+| `BETTER_AUTH_SECRET` | `<long-random-secret>` | Never set this in the client project. Generate a long random value. |
+| `BETTER_AUTH_URL` | `https://<api-host>` | This is the **API origin** (not the client origin); the client derives its endpoint as `${NEXT_PUBLIC_API_URL}/better-auth`. |
 
 ### Optional / feature-specific
 
@@ -25,6 +34,7 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 | `STRIPE_SECRET_KEY` | — | Checkout/payment endpoints return `503` ("Stripe is not configured"). Needed only for Pro-plan payments. |
 | `STRIPE_WEBHOOK_SECRET` | — | `POST /api/payments/webhook` returns `503` ("Stripe webhook is not configured"). Set it together with `STRIPE_SECRET_KEY`. |
 | `IMGBB_API_KEY` | — | `/api/upload/image` returns `503` ("ImgBB is not configured"). Needed only for image uploads. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — | Google sign-in is disabled and `/api/auth/google/status` returns `enabled:false`. Both are server-only; never add `NEXT_PUBLIC_GOOGLE_*` to the client. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | `admin@mentorlagbe.com`, `Admin@12345`, `MentorLagbe Admin` | Not needed to boot. `npm run seed` falls back to these documented demo defaults; **`npm run seed:admin` requires `ADMIN_EMAIL` and `ADMIN_PASSWORD`** in `.env`/host env and fails if either is absent (`ADMIN_NAME` remains optional there). |
 
 - Seeding is idempotent (`$setOnInsert`): it does **not** overwrite existing accounts. Changing `ADMIN_PASSWORD` and re-running a seed therefore does **not** rotate the existing admin's password — update it through the app or database instead.
@@ -34,6 +44,8 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 
 - `GET /health` → `200 {"success":true,"status":"OK"}` (returns `503` if MongoDB is unavailable).
 - `GET /` → API running message.
+- `GET /api/better-auth/ok` → `200 {"ok":true}`; `GET /api/better-auth/get-session` → `200 null` without a cookie.
+- `GET /api/auth/google/status` → `200 {"success":true,"enabled":false}` when Google keys are absent.
 - Unknown `/api/*` → JSON `404`.
 - Stripe webhook: `POST /api/payments/webhook` (raw body, signature verified). Register this URL in Stripe and subscribe to `checkout.session.completed` / `checkout.session.async_payment_succeeded`.
 - Stripe checkout success URL: `<CLIENT_URL>/payment/success?session_id={CHECKOUT_SESSION_ID}`.

@@ -7,6 +7,10 @@ import {
   getMyProfile,
   updateMyProfile,
 } from "../controllers/authController.js";
+import {
+  googleAuthStatus,
+  googleAuthCallback,
+} from "../controllers/googleAuthController.js";
 
 import {
   verifyToken,
@@ -14,6 +18,10 @@ import {
 } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+// Google OAuth (BetterAuth → legacy JWT bridge)
+router.get("/google/status", googleAuthStatus);
+router.get("/google/callback", googleAuthCallback);
 
 // Student and Tutor Registration
 router.post("/register", registerUser);

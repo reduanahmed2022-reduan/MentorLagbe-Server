@@ -32,6 +32,15 @@ MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>/?retryWrites=true&w=majority
 JWT_SECRET=<long-random-secret>
 ```
 
+**Preflight-required (`node scripts/verify-env.mjs`):**
+
+```env
+BETTER_AUTH_SECRET=<long-random-secret>
+BETTER_AUTH_URL=https://<api-host>
+```
+
+`BETTER_AUTH_URL` হলো **API origin** (client origin নয়) — client endpoint বানায় `${NEXT_PUBLIC_API_URL}/better-auth`। দুটি `BETTER_AUTH_*` ভ্যারিয়েবল preflight-এ বাধ্যতামূলক; সার্ভার-সাইডেই রাখতে হবে, Vercel/client-এ নয়।
+
 ```bash
 node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 ```
@@ -40,6 +49,7 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 | --- | --- |
 | `MONGODB_URI` | `config/db.js` import-এই throw → process exit |
 | `JWT_SECRET` | `index.js` Start-এ throw → process exit |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | `scripts/verify-env.mjs` preflight_fail; শুধু `BETTER_AUTH_SECRET` না দিলে `/api/better-auth` বন্ধ থাকে, `BETTER_AUTH_URL` না দিলে local API origin ব্যবহার হয়; legacy JWT API চলে |
 
 **Optional / feature-specific (সার্ভার উঠবে, ফিচারের উপর নির্ভর করে 503):**
 
@@ -51,9 +61,12 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 | `STRIPE_SECRET_KEY` | — | `/api/payments/checkout`, `/verify` → 503 |
 | `STRIPE_WEBHOOK_SECRET` | — | `POST /api/payments/webhook` → 503 |
 | `IMGBB_API_KEY` | — | `POST /api/upload/image` → 503 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — | Google sign-in বন্ধ; `/api/auth/google/status` → `enabled:false`. শুধু server-এ রাখুন, Vercel/client-এ নয় |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | `admin@mentorlagbe.com`, `Admin@12345`, `MentorLagbe Admin` | শুধু seed-এর জন্য (`seed:admin`-এ EMAIL+PASSWORD বাধ্যতামূলক) |
 
 `CLIENT_URL` comma-separated হতে পারে (CORS), কিন্তু **Stripe redirect শুধু প্রথম origin ব্যবহার করে** — প্রধান client-কে প্রথমে রাখুন।
+
+Google sign-in চালু করতে দুইটি Google key server `.env`-এ দিন এবং Google Console-এ authorized redirect URI হিসেবে `${BETTER_AUTH_URL}/api/better-auth/callback/google` যোগ করুন। Client-এ কোনো Google secret দিতে হবে না; button-এর availability `/api/auth/google/status` থেকে আসে।
 
 ---
 

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { getDB } from "../config/db.js";
 import { ObjectId } from "mongodb";
+import { getAuth, isBetterAuthConfigured } from "../config/betterAuth.js";
 
 export const registerUser = async (req, res) => {
   try {
@@ -50,25 +51,104 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const registeredName = name.trim();
+    const registeredRole = role.toLowerCase();
+    let userId;
 
-    // Create user
-    const newUser = {
-      name: name.trim(),
-      email: normalizedEmail,
-      password: hashedPassword,
-      role: role.toLowerCase(),
-      createdAt: new Date(),
-    };
+    if (isBetterAuthConfigured()) {
+      try {
+        const auth = await getAuth();
+        const signUp = await auth.api.signUpEmail({
+          body: {
+            name: registeredName,
+            email: normalizedEmail,
+            password,
+          },
+        });
 
-    const result = await usersCollection.insertOne(newUser);
+        // A generic duplicate response has no session token. Map it to the
+        // same 409 contract the legacy pre-check produces.
+        if (!signUp?.user?.id || signUp.token === null) {
+          return res.status(409).json({
+            success: false,
+            message: "Email already registered",
+          });
+        }
 
-    // Generate JWT token
+        userId = signUp.user.id;
+
+        // The Mongo adapter stores BetterAuth-generated string ids, while every
+        // legacy controller queries `users._id` as an ObjectId. Migrate this one
+        // document to an ObjectId and sync the fields the JWT flow still needs.
+        const hashedPassword = await bcrypt.hash(password, 12);
+        const objectId = new ObjectId(userId);
+        const baUser = await usersCollection.findOne({ _id: userId });
+
+        if (baUser) {
+          const { _id: _stringId, ...userDoc } = baUser;
+
+          await usersCollection.deleteOne({ _id: userId });
+          await usersCollection.insertOne({
+            ...userDoc,
+            _id: objectId,
+            role: registeredRole,
+            password: hashedPassword,
+            profileImage: "",
+            updatedAt: new Date(),
+          });
+        } else {
+          await usersCollection.updateOne(
+            { _id: objectId },
+            {
+              $set: {
+                role: registeredRole,
+                password: hashedPassword,
+                profileImage: "",
+                updatedAt: new Date(),
+              },
+            }
+          );
+        }
+      } catch (error) {
+        // BetterAuth throws a 422 APIError for duplicates in this config. Keep
+        // the legacy 409 contract even when the pre-check loses a race.
+        if (
+          error?.status === "UNPROCESSABLE_ENTITY" ||
+          error?.statusCode === 422 ||
+          /already exists/i.test(error?.message || "")
+        ) {
+          return res.status(409).json({
+            success: false,
+            message: "Email already registered",
+          });
+        }
+
+        // Fall back to the legacy insert when BetterAuth is unavailable.
+        console.error("BetterAuth sign-up fallback:", error.message);
+        userId = undefined;
+      }
+    }
+
+    if (!userId) {
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const newUser = {
+        name: registeredName,
+        email: normalizedEmail,
+        password: hashedPassword,
+        role: registeredRole,
+        createdAt: new Date(),
+      };
+
+      const result = await usersCollection.insertOne(newUser);
+      userId = result.insertedId.toString();
+    }
+
+    // Generate JWT token — payload and options are intentionally unchanged.
     const token = jwt.sign(
       {
-        userId: result.insertedId.toString(),
-        role: newUser.role,
+        userId: String(userId),
+        role: registeredRole,
       },
       process.env.JWT_SECRET,
       {
@@ -81,11 +161,11 @@ export const registerUser = async (req, res) => {
       message: "Registration successful",
       token,
       user: {
-        id: result.insertedId.toString(),
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        plan: newUser.plan || "free",
+        id: String(userId),
+        name: registeredName,
+        email: normalizedEmail,
+        role: registeredRole,
+        plan: "free",
       },
     });
   } catch (error) {
@@ -116,29 +196,51 @@ export const loginUser = async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Find user
-    const user = await usersCollection.findOne({
-      email: normalizedEmail,
-    });
+    let user = null;
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+    if (isBetterAuthConfigured()) {
+      try {
+        const auth = await getAuth();
+        const signIn = await auth.api.signInEmail({
+          body: { email: normalizedEmail, password },
+        });
+
+        if (signIn?.user?.id && ObjectId.isValid(signIn.user.id)) {
+          user = await usersCollection.findOne({
+            _id: new ObjectId(signIn.user.id),
+          });
+        }
+      } catch (error) {
+        // Fall back to the legacy bcrypt check below. Seeded users have no
+        // persistent account document, so their credentials are synthesized
+        // from users.password inside the BetterAuth adapter wrapper.
+      }
     }
 
-    // Compare password
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password
-    );
-
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
+    if (!user) {
+      // Legacy path (also the fallback when BetterAuth is unavailable).
+      user = await usersCollection.findOne({
+        email: normalizedEmail,
       });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
+
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        user.password || ""
+      );
+
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
     }
 
     // Generate JWT token
