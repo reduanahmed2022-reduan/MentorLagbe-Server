@@ -62,78 +62,96 @@ const sanitizeUploadName = (originalName) => {
   return `${stem.slice(0, maxLength - extension.length)}${extension}`;
 };
 
-// Upload an image file directly to ImgBB and return the hosted URL.
-router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
-  try {
-    if (!process.env.IMGBB_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        message: "ImgBB is not configured. Please set IMGBB_API_KEY.",
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide an image file in the 'image' field",
-      });
-    }
-
-    if (!hasImageSignature(req.file.buffer)) {
-      return res.status(400).json({
-        success: false,
-        message: "Only JPG, PNG, GIF or WEBP images are allowed",
-      });
-    }
-
-    const form = new FormData();
-    form.append("key", process.env.IMGBB_API_KEY);
-    form.append("image", Buffer.from(req.file.buffer).toString("base64"));
-    form.append("name", `${Date.now()}-${sanitizeUploadName(req.file.originalname)}`);
-
-    const response = await fetch("https://api.imgbb.com/1/upload", {
-      method: "POST",
-      body: form,
-      // Don't let a slow upstream turn into a platform 504.
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!response.ok) {
-      return res.status(502).json({
-        success: false,
-        message: "Image host rejected the upload",
-      });
-    }
-
-    const result = await response.json();
-
-    if (!result.success || !result.data?.url) {
-      return res.status(502).json({
-        success: false,
-        message: "Image upload failed. Please try another image.",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      imageUrl: result.data.url,
-      deleteUrl: result.data.delete_url,
-    });
-  } catch (error) {
-    console.error("ImgBB Upload Error:", error.message);
-
-    if (error.name === "TimeoutError" || error.name === "AbortError") {
-      return res.status(504).json({
-        success: false,
-        message: "Image host did not respond in time. Please try again.",
-      });
-    }
-
-    return res.status(500).json({
+const requireImgBB = (req, res, next) => {
+  if (!process.env.IMGBB_API_KEY) {
+    return res.status(503).json({
       success: false,
-      message: "Failed to upload image",
+      message: "ImgBB is not configured. Please set IMGBB_API_KEY.",
     });
   }
-});
+
+  return next();
+};
+
+// Upload an image file directly to ImgBB and return the hosted URL.
+router.post(
+  "/image",
+  verifyToken,
+  requireImgBB,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide an image file in the 'image' field",
+        });
+      }
+
+      if (!hasImageSignature(req.file.buffer)) {
+        return res.status(400).json({
+          success: false,
+          message: "Only JPG, PNG, GIF or WEBP images are allowed",
+        });
+      }
+
+      const form = new FormData();
+      form.append("key", process.env.IMGBB_API_KEY);
+      form.append("image", req.file.buffer.toString("base64"));
+      form.append("name", `${Date.now()}-${sanitizeUploadName(req.file.originalname)}`);
+
+      const response = await fetch("https://api.imgbb.com/1/upload", {
+        method: "POST",
+        body: form,
+        // Don't let a slow upstream turn into a platform 504.
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) {
+        return res.status(502).json({
+          success: false,
+          message: "Image host rejected the upload",
+        });
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        return res.status(502).json({
+          success: false,
+          message: "Image host returned an invalid response",
+        });
+      }
+
+      if (!result.success || !result.data?.url) {
+        return res.status(502).json({
+          success: false,
+          message: "Image upload failed. Please try another image.",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        imageUrl: result.data.url,
+        deleteUrl: result.data.delete_url,
+      });
+    } catch (error) {
+      console.error("ImgBB Upload Error:", error.message);
+
+      if (error.name === "TimeoutError" || error.name === "AbortError") {
+        return res.status(504).json({
+          success: false,
+          message: "Image host did not respond in time. Please try again.",
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload image",
+      });
+    }
+  }
+);
 
 // Surface multer errors as JSON instead of Express' default HTML error page.
 router.use((error, req, res, next) => {

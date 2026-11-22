@@ -10,10 +10,19 @@ export const getAllUsers = async (req, res) => {
     const users = await db
       .collection("users")
       .find(
-        {},
+        { role: { $in: ["student", "tutor", "admin"] } },
         {
           projection: {
-            password: 0,
+            name: 1,
+            email: 1,
+            role: 1,
+            plan: 1,
+            profileImage: 1,
+            phone: 1,
+            bio: 1,
+            location: 1,
+            createdAt: 1,
+            updatedAt: 1,
           },
         }
       )

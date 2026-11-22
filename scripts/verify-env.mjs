@@ -13,7 +13,12 @@ import dotenv from "dotenv";
 
 dotenv.config({ quiet: true });
 
-const REQUIRED = ["MONGODB_URI", "JWT_SECRET"];
+const REQUIRED = [
+  "MONGODB_URI",
+  "JWT_SECRET",
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+];
 
 const RECOMMENDED = [
   "CLIENT_URL",

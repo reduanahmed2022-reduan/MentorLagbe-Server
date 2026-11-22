@@ -15,33 +15,46 @@ const DEMO_EMAIL =
 const DEMO_PASSWORD =
   process.env.DEMO_PASSWORD || process.env.STUDENT_PASSWORD || "Tutor@12345";
 
-const TIMEOUT_MS = 10_000;
+const TIMEOUT_MS = 30_000;
+const MAX_ATTEMPTS = 2;
 
 async function api(method, path, body) {
-  try {
-    const response = await fetch(`${BASE_URL}${path}`, {
-      method,
-      headers: {
-        Accept: "application/json",
-        ...(body ? { "Content-Type": "application/json" } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      redirect: "manual",
-      cache: "no-store",
-    });
-
-    let data = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      data = await response.json();
-    } catch {
-      // Non-JSON or empty body; validators report the invalid payload.
-    }
+      const response = await fetch(`${BASE_URL}${path}`, {
+        method,
+        headers: {
+          Accept: "application/json",
+          Connection: "close",
+          ...(body ? { "Content-Type": "application/json" } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        redirect: "manual",
+        cache: "no-store",
+      });
 
-    return { status: response.status, data };
-  } catch {
-    // Never echo the error: it can contain a credential-bearing BASE_URL.
-    return { status: 0, data: null, networkError: true };
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        // Non-JSON or empty body; validators report the invalid payload.
+      }
+
+      return { status: response.status, data };
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS) {
+        // Only a code/name: the error can embed a credential-bearing BASE_URL.
+        return {
+          status: 0,
+          data: null,
+          networkError: true,
+          errorCode: error?.name || error?.code || "UNKNOWN",
+        };
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 }
 

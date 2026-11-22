@@ -124,14 +124,13 @@ async function seed() {
       description,
       tutorName: tutor.name,
       tutorEmail,
-      approvalStatus,
       isActive: true,
       createdAt: new Date(now - insertedTuitions.length * 86400000),
     };
 
     await tuitionsCollection.updateOne(
       { title, tutorEmail },
-      { $setOnInsert: document },
+      { $set: { approvalStatus }, $setOnInsert: document },
       { upsert: true }
     );
 
