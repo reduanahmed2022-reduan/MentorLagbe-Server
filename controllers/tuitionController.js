@@ -1026,3 +1026,46 @@ export const deleteMyTuition = async (req, res) => {
     });
   }
 };
+
+
+// Get Single Approved Tuition Details (Public)
+export const getTuitionById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tuition ID",
+      });
+    }
+
+    const db = getDB();
+
+    const tuition = await db.collection("tuitions").findOne({
+      _id: new ObjectId(id),
+      approvalStatus: "approved",
+      isActive: true,
+    });
+
+    if (!tuition) {
+      return res.status(404).json({
+        success: false,
+        message: "Tuition not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      tuition,
+    });
+  } catch (error) {
+    console.error("Get Tuition Details Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve tuition details",
+    });
+  }
+};
+

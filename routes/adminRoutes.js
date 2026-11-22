@@ -3,6 +3,7 @@ import express from "express";
 
 import {
   getAllUsers,
+  updateUserRole,
   getAllAdminTuitions,
   getAdminStats,
   getAllTransactions,
@@ -16,12 +17,14 @@ import {
 const router = express.Router();
 
 // Admin Only: Get All Users
-router.get(
-  "/users",
+router.get("/users", verifyToken, verifyAdmin, getAllUsers);
+
+// Admin Only: Change a user's role
+router.patch(
+  "/users/:id/role",
   verifyToken,
   verifyAdmin,
-  getAllUsers,
- getAllTransactions,
+  updateUserRole
 );
 
 // Admin Only: Get All Tuitions

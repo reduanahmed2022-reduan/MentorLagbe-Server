@@ -9,6 +9,7 @@ import {
   getMyTuitions,
   updateMyTuition,
   deleteMyTuition,
+  getTuitionById,
 } from "../controllers/tuitionController.js";
 
 import {
@@ -53,6 +54,9 @@ router.get(
   verifyTutor,
   getMyTuitions
 );
+
+// Public: Get Single Tuition Details (kept after static routes to avoid shadowing)
+router.get("/:id", getTuitionById);
 
 // Tutor Only: Update My Tuition
 router.patch(
