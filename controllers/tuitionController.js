@@ -541,6 +541,21 @@ export const createTuition = async (req, res) => {
       });
     }
 
+    // Free tutors may publish at most 2 tuitions; Pro tutors are unlimited.
+    if (tutor.plan !== "pro") {
+      const existingCount = await db
+        .collection("tuitions")
+        .countDocuments({ tutorEmail: tutor.email });
+
+      if (existingCount >= 2) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Free tutors can post up to 2 tuitions. Upgrade to Pro for unlimited posts.",
+        });
+      }
+    }
+
     // Create tuition document
     const newTuition = {
       title: title.trim(),
@@ -592,6 +607,8 @@ export const getAllTuitions = async (req, res) => {
       location,
       minFee,
       maxFee,
+      page,
+      limit,
     } = req.query;
 
     // Validate text query parameters
@@ -701,15 +718,37 @@ export const getAllTuitions = async (req, res) => {
       }
     }
 
-    const tuitions = await db
-      .collection("tuitions")
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .toArray();
+    // Optional server-side pagination (default: all results for existing clients).
+    const hasPagination = page !== undefined || limit !== undefined;
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const pageSize = Math.min(50, Math.max(1, Number(limit) || 12));
+
+    if (hasPagination && (!Number.isFinite(Number(page)) || !Number.isFinite(Number(limit)))) {
+      return res.status(400).json({
+        success: false,
+        message: "page and limit must be numbers",
+      });
+    }
+
+    const tuitionsCollection = db.collection("tuitions");
+    const total = await tuitionsCollection.countDocuments(filter);
+
+    const query = tuitionsCollection.find(filter).sort({ createdAt: -1 });
+
+    if (hasPagination) {
+      query.skip((pageNumber - 1) * pageSize).limit(pageSize);
+    }
+
+    const tuitions = await query.toArray();
 
     return res.status(200).json({
       success: true,
-      total: tuitions.length,
+      total,
+      ...(hasPagination && {
+        page: pageNumber,
+        limit: pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      }),
       tuitions,
     });
   } catch (error) {
@@ -880,6 +919,7 @@ export const updateMyTuition = async (req, res) => {
       monthlyFee,
       daysPerWeek,
       description,
+      bannerImage,
     } = req.body;
 
     // Validate Required Fields
@@ -944,6 +984,7 @@ export const updateMyTuition = async (req, res) => {
           monthlyFee: fee,
           daysPerWeek: days,
           description: description.trim(),
+          ...(bannerImage !== undefined && { bannerImage }),
           updatedAt: new Date(),
         },
       }
@@ -1065,6 +1106,66 @@ export const getTuitionById = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to retrieve tuition details",
+    });
+  }
+};
+
+// Tutor Only: Toggle a tuition between Active and Closed
+export const toggleTuitionStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tuition ID",
+      });
+    }
+
+    const db = getDB();
+
+    const tutor = await db.collection("users").findOne({
+      _id: new ObjectId(req.user.userId),
+      role: "tutor",
+    });
+
+    if (!tutor) {
+      return res.status(404).json({
+        success: false,
+        message: "Tutor account not found",
+      });
+    }
+
+    const tuition = await db.collection("tuitions").findOne({
+      _id: new ObjectId(id),
+      tutorEmail: tutor.email,
+    });
+
+    if (!tuition) {
+      return res.status(404).json({
+        success: false,
+        message: "Tuition not found or access denied",
+      });
+    }
+
+    const isActive = !tuition.isActive;
+
+    await db.collection("tuitions").updateOne(
+      { _id: tuition._id },
+      { $set: { isActive, updatedAt: new Date() } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Tuition marked as ${isActive ? "Active" : "Closed"}`,
+      isActive,
+    });
+  } catch (error) {
+    console.error("Toggle Tuition Status Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update tuition status",
     });
   }
 };

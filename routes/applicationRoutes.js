@@ -6,6 +6,7 @@ import {
   applyToTuition,
   getTutorApplicants,
   updateApplicationStatus,
+  cancelApplication,
 } from "../controllers/applicationController.js";
 
 import {
@@ -30,6 +31,14 @@ router.post(
   verifyToken,
   verifyStudent,
   applyToTuition
+);
+
+// Student Only: Cancel a pending application
+router.delete(
+  "/:id",
+  verifyToken,
+  verifyStudent,
+  cancelApplication
 );
 
 // Tutor Only: Get My Applicants

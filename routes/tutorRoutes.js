@@ -2,6 +2,7 @@
 import express from "express";
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/db.js";
+import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -99,7 +100,7 @@ router.get("/", async (req, res) => {
 });
 
 //POST route
-router.post("/", async (req, res) => {
+router.post("/", verifyToken, verifyAdmin, async (req, res) => {
     try {
         const {
             name,
@@ -173,7 +174,7 @@ router.post("/", async (req, res) => {
 
 
 // PUT: Update tutor by ID
-router.put("/:id", async (req, res) => {
+router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -306,7 +307,7 @@ router.get("/:id", async (req, res) => {
 
 
 // DELETE: Delete tutor by ID
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 

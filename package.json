@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "node --watch index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "seed": "node seedDemoData.js",
+    "seed:admin": "node seedAdmin.js",
+    "seed:tutors": "node seedTutors.js"
   },
   "keywords": [],
   "author": "",

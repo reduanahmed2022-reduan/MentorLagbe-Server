@@ -10,6 +10,7 @@ import {
   updateMyTuition,
   deleteMyTuition,
   getTuitionById,
+  toggleTuitionStatus,
 } from "../controllers/tuitionController.js";
 
 import {
@@ -64,6 +65,14 @@ router.patch(
   verifyToken,
   verifyTutor,
   updateMyTuition
+);
+
+// Tutor Only: Toggle Active / Closed status
+router.patch(
+  "/:id/status",
+  verifyToken,
+  verifyTutor,
+  toggleTuitionStatus
 );
 
 // Tutor Only: Delete My Tuition

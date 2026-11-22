@@ -293,3 +293,56 @@ export const updateApplicationStatus = async (req, res) => {
     });
   }
 };
+
+// Student: Cancel an application while it is still pending
+export const cancelApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid application ID",
+      });
+    }
+
+    const db = getDB();
+
+    const student = await db.collection("users").findOne({
+      _id: new ObjectId(req.user.userId),
+      role: "student",
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student account not found",
+      });
+    }
+
+    const result = await db.collection("applications").deleteOne({
+      _id: new ObjectId(id),
+      studentEmail: student.email,
+      status: "pending",
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Pending application not found or already reviewed",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Application cancelled successfully",
+    });
+  } catch (error) {
+    console.error("Cancel Application Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to cancel application",
+    });
+  }
+};

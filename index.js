@@ -8,6 +8,9 @@ import authRoutes from "./routes/authRoutes.js";
 import tuitionRoutes from "./routes/tuitionRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
+import webhookRoutes from "./routes/webhookRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 dotenv.config();
 
@@ -34,6 +37,9 @@ app.use(
   })
 );
 
+// Stripe webhook must receive the raw body for signature verification.
+app.use("/api/payments", webhookRoutes);
+
 app.use(express.json());
 
 // API Routes
@@ -42,6 +48,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tuitions", tuitionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/applications", applicationRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Home route
 app.get("/", (req, res) => {
