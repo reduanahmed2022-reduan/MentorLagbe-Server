@@ -495,7 +495,9 @@ export async function getAuth() {
         secret: process.env.BETTER_AUTH_SECRET,
         baseURL,
         basePath: BETTER_AUTH_BASE_PATH,
-        trustedOrigins: CLIENT_ORIGINS,
+        // Google's callbackURL points at this API origin, so BetterAuth must
+        // trust it in addition to the browser client origins.
+        trustedOrigins: [...new Set([...CLIENT_ORIGINS, baseURL])],
         database: wrapMongoAdapter(baseAdapter),
         secondaryStorage,
         // Internal auth.api calls carry no request headers; a shared rate
