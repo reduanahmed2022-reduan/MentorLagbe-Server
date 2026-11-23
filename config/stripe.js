@@ -20,7 +20,14 @@ const configuredOrigins = [
 export const CLIENT_ORIGINS = configuredOrigins.length
   ? configuredOrigins
   : ["http://localhost:3000"];
-export const CLIENT_URL = CLIENT_ORIGINS[0];
+// Stripe redirects need a single URL. Prefer the deployed HTTPS origin so
+// payment success/cancel land on the live client instead of localhost.
+// CORS still accepts all configured origins.
+export const CLIENT_URL =
+  process.env.NODE_ENV === "production"
+    ? CLIENT_ORIGINS.find((origin) => !origin.startsWith("http://localhost")) ||
+      CLIENT_ORIGINS[0]
+    : CLIENT_ORIGINS[0];
 
 // Prices are in USD cents, as required by the assignment.
 export const PRO_PLANS = {
