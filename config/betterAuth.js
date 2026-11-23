@@ -3,9 +3,14 @@ import { mongodbAdapter } from "@better-auth/mongo-adapter";
 import { betterAuth } from "better-auth";
 import { ObjectId } from "mongodb";
 import { getClient, getDB } from "./db.js";
-import { CLIENT_ORIGINS } from "./stripe.js";
+import { CLIENT_ORIGINS, CLIENT_URL } from "./stripe.js";
 
 export const BETTER_AUTH_BASE_PATH = "/api/better-auth";
+
+// Failed Google logins must finish on the browser client, never on this API
+// origin. BetterAuth uses this for every OAuth error it handles instead of
+// `${baseURL}/error`, which in production bounces the user to the Render root.
+const CLIENT_GOOGLE_CALLBACK = `${String(CLIENT_URL).replace(/\/+$/, "")}/auth/google/callback`;
 
 /**
  * BetterAuth is optional at runtime so the legacy JWT API still boots when the
@@ -498,6 +503,9 @@ export async function getAuth() {
         // Google's callbackURL points at this API origin, so BetterAuth must
         // trust it in addition to the browser client origins.
         trustedOrigins: [...new Set([...CLIENT_ORIGINS, baseURL])],
+        // Without this, state mismatches / provider denials redirect to the
+        // backend origin (root in production) instead of the client error UI.
+        onAPIError: { errorURL: CLIENT_GOOGLE_CALLBACK },
         database: wrapMongoAdapter(baseAdapter),
         secondaryStorage,
         // Internal auth.api calls carry no request headers; a shared rate

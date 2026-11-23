@@ -68,8 +68,26 @@ app.use("/api/applications", applicationRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
 
+// Safety net: BetterAuth's default OAuth error page lives on this API origin,
+// and in production it falls back to `/` — that is what strands the browser on
+// the Render domain. Forward any such visit to the client's callback page.
+const clientGoogleCallback = `${String(CLIENT_URL).replace(/\/+$/, "")}/auth/google/callback`;
+
+function redirectOAuthErrorToClient(req, res) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(req.query || {})) {
+    if (typeof value === "string" && value) params.set(key, value);
+  }
+  if (![...params.keys()].length) params.set("error", "unexpected");
+  return res.redirect(302, `${clientGoogleCallback}?${params.toString()}`);
+}
+
+app.get("/error", redirectOAuthErrorToClient);
+
 // Home route
 app.get("/", (req, res) => {
+  if (req.query.error) return redirectOAuthErrorToClient(req, res);
+
   res.status(200).json({
     success: true,
     message: "MentorLagbe API is running successfully!",
