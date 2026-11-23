@@ -2,7 +2,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { closeDB, connectDB, getDB } from "./config/db.js";
+import { closeDB, connectDB } from "./config/db.js";
 import { CLIENT_ORIGINS, CLIENT_URL } from "./config/stripe.js";
 import tutorRoutes from "./routes/tutorRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -21,7 +21,7 @@ import {
 
 dotenv.config();
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT || 5000;
 
 // The BetterAuth instance needs a connected DB, so its handler is installed in
@@ -76,10 +76,13 @@ app.get("/", (req, res) => {
   });
 });
 
-// Health route (also confirms the database is still reachable)
+// Health route (also confirms the database is still reachable).
+// connectDB() is idempotent, so this also covers cold starts where a request
+// arrives before the standalone server's explicit initialization ran.
 app.get("/health", async (req, res) => {
   try {
-    await getDB().command({ ping: 1 });
+    const db = await connectDB();
+    await db.command({ ping: 1 });
 
     return res.status(200).json({
       success: true,
@@ -135,42 +138,64 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Start server after database connection
-async function startServer() {
-  try {
-    if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is missing from .env file");
-    }
+/**
+ * Shared, idempotent initialization for both the standalone server and the
+ * Vercel serverless handler. On Vercel a request can reach a route before any
+ * listen() callback ran, so the handler awaits this before calling the app.
+ */
+let readyPromise = null;
 
-    if (isBetterAuthConfigured() && !process.env.BETTER_AUTH_URL) {
-      console.warn("Warning: BETTER_AUTH_URL is not set; using the local API origin.");
-    }
-    if (!isBetterAuthConfigured()) {
-      console.warn("Warning: BETTER_AUTH_SECRET is not set; /api/better-auth is disabled.");
-    }
+export function ensureReady() {
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET is missing from .env file");
+      }
 
-    if (process.env.NODE_ENV === "production") {
-      for (const key of [
-        "STRIPE_SECRET_KEY",
-        "STRIPE_WEBHOOK_SECRET",
-        "IMGBB_API_KEY",
-      ]) {
-        if (!process.env[key]) {
-          console.warn(`Warning: ${key} is not set; related features will return 503.`);
+      if (isBetterAuthConfigured() && !process.env.BETTER_AUTH_URL) {
+        console.warn("Warning: BETTER_AUTH_URL is not set; using the local API origin.");
+      }
+      if (!isBetterAuthConfigured()) {
+        console.warn("Warning: BETTER_AUTH_SECRET is not set; /api/better-auth is disabled.");
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        for (const key of [
+          "STRIPE_SECRET_KEY",
+          "STRIPE_WEBHOOK_SECRET",
+          "IMGBB_API_KEY",
+        ]) {
+          if (!process.env[key]) {
+            console.warn(`Warning: ${key} is not set; related features will return 503.`);
+          }
+        }
+
+        if (CLIENT_URL.startsWith("http://localhost")) {
+          console.warn("Warning: CLIENT_URL still points to localhost; CORS and Stripe redirects will fail in production.");
         }
       }
 
-      if (CLIENT_URL.startsWith("http://localhost")) {
-        console.warn("Warning: CLIENT_URL still points to localhost; CORS and Stripe redirects will fail in production.");
+      await connectDB();
+
+      if (isBetterAuthConfigured()) {
+        betterAuthHandler = toNodeHandler(await getAuth());
+        console.log(`BetterAuth mounted at ${BETTER_AUTH_BASE_PATH}`);
       }
-    }
+    })().catch((error) => {
+      // Allow the next invocation to retry instead of caching a failed boot.
+      readyPromise = null;
+      throw error;
+    });
+  }
 
-    await connectDB();
+  return readyPromise;
+}
 
-    if (isBetterAuthConfigured()) {
-      betterAuthHandler = toNodeHandler(await getAuth());
-      console.log(`BetterAuth mounted at ${BETTER_AUTH_BASE_PATH}`);
-    }
+// Standalone mode (Render/Railway/local). Vercel imports `app` from
+// api/index.js and never calls listen().
+async function startServer() {
+  try {
+    await ensureReady();
 
     const server = app.listen(PORT, () => {
       console.log(`MentorLagbe server running on port ${PORT}`);
@@ -207,4 +232,7 @@ async function startServer() {
   }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+export default app;

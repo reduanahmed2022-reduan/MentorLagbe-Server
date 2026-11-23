@@ -13,13 +13,22 @@ if (!uri) {
 // the BetterAuth MongoDB adapter is guaranteed to share this exact pool/DB.
 export const DB_NAME = "MantorLagbe";
 
-const client = new MongoClient(uri, {
+const clientOptions = {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
   },
-});
+  serverSelectionTimeoutMS: 20000,
+};
+
+// Atlas requires TLS. Legacy Atlas URIs use the deprecated `ssl=true` flag,
+// which newer driver versions may ignore, so set the modern option explicitly.
+if (/(mongodb\+srv:\/\/|\.mongodb\.net)/i.test(uri)) {
+  clientOptions.tls = true;
+}
+
+const client = new MongoClient(uri, clientOptions);
 
 /** Safe before connectDB(): creating a Db handle performs no I/O. */
 export function getClient() {
