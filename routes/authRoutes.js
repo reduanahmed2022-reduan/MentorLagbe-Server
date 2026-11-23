@@ -9,6 +9,7 @@ import {
 } from "../controllers/authController.js";
 import {
   googleAuthStatus,
+  googleAuthStart,
   googleAuthCallback,
 } from "../controllers/googleAuthController.js";
 
@@ -21,6 +22,8 @@ const router = express.Router();
 
 // Google OAuth (BetterAuth → legacy JWT bridge)
 router.get("/google/status", googleAuthStatus);
+// Top-level navigation keeps the SameSite=Lax state cookie first-party.
+router.get("/google/start", googleAuthStart);
 router.get("/google/callback", googleAuthCallback);
 
 // Student and Tutor Registration

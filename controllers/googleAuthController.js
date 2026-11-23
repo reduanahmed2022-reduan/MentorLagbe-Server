@@ -31,6 +31,70 @@ export const googleAuthStatus = (_req, res) => {
 };
 
 /**
+ * Start Google OAuth from a real top-level navigation.
+ *
+ * The SPA used to call BetterAuth's /sign-in/social via a cross-site fetch.
+ * Browsers refuse to store its SameSite=Lax state cookie from that context (or
+ * block it as a third-party cookie), so Google's callback arrived without the
+ * state and failed with "auth state cookie not found". Setting the cookie on a
+ * first-party top-level response makes the whole round trip work again.
+ */
+export const googleAuthStart = async (req, res) => {
+  try {
+    if (!isBetterAuthConfigured() || !isGoogleAuthConfigured()) {
+      return redirectToClient(res, { error: "unavailable" });
+    }
+
+    const requestedRole =
+      typeof req.query.role === "string" ? req.query.role.toLowerCase() : "";
+    const role = ALLOWED_ROLES.has(requestedRole) ? requestedRole : "student";
+
+    const configuredBaseUrl =
+      process.env.BETTER_AUTH_URL || `http://localhost:${process.env.PORT || 5000}`;
+    let apiOrigin;
+    try {
+      apiOrigin = new URL(configuredBaseUrl).origin;
+    } catch {
+      apiOrigin = `http://localhost:${process.env.PORT || 5000}`;
+    }
+
+    const callbackURL = `${apiOrigin}/api/auth/google/callback?role=${encodeURIComponent(role)}`;
+    const clientOrigin = String(CLIENT_URL).replace(/\/+$/, "");
+
+    const auth = await getAuth();
+    const result = await auth.api.signInSocial({
+      body: {
+        provider: "google",
+        callbackURL,
+        newUserCallbackURL: callbackURL,
+        errorCallbackURL: `${clientOrigin}/auth/google/callback`,
+      },
+      headers: fromNodeHeaders(req.headers),
+      returnHeaders: true,
+    });
+
+    // Forward the encrypted OAuth state cookie to the browser before the
+    // redirect to Google; the callback needs it to validate the response.
+    const setCookies =
+      typeof result?.headers?.getSetCookie === "function"
+        ? result.headers.getSetCookie()
+        : result?.headers?.get?.("set-cookie");
+    if (setCookies) res.setHeader("Set-Cookie", setCookies);
+
+    const googleURL = result?.response?.url;
+    if (!googleURL) {
+      console.error("Google auth start error: missing provider URL");
+      return redirectToClient(res, { error: "unexpected" });
+    }
+
+    return res.redirect(302, googleURL);
+  } catch (error) {
+    console.error("Google auth start error:", error?.message);
+    return redirectToClient(res, { error: "unexpected" });
+  }
+};
+
+/**
  * Convert the BetterAuth session created by Google into the legacy JWT session
  * contract. Role from sign-up is applied only to brand-new users; existing
  * users (including admins) keep their stored role.
