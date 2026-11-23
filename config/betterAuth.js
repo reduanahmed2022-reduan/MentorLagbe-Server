@@ -277,6 +277,32 @@ function wrapMongoAdapter(adapterFactory) {
   return (options) => {
     const base = adapterFactory(options);
 
+    /**
+     * BetterAuth's `findAccountOwnerByKey` reads accounts with `join: { user: true }`
+     * and classifies a missing user as an `orphaned` account (which aborts OAuth
+     * with `unable_to_link_account`). Our account rows live in memory, so the
+     * Mongo adapter's own join cannot see them. Resolve the joined user here.
+     */
+    const attachJoinedUsers = async (records, joinUser) => {
+      if (!joinUser || !Array.isArray(records)) return records;
+
+      return Promise.all(
+        records.map(async (record) => {
+          const user = record?.userId
+            ? await base.findOne({
+                model: "user",
+                where: [{ field: "id", value: record.userId }],
+              })
+            : null;
+
+          if (!user) return { ...record, user: null };
+
+          const { account: _nestedAccount, ...safeUser } = user;
+          return { ...record, user: safeUser };
+        })
+      );
+    };
+
     const wrapped = {
       ...base,
       create: async (input) => {
@@ -294,7 +320,10 @@ function wrapMongoAdapter(adapterFactory) {
             matchesWhere(item, input.where)
           );
 
-          return record ? selectFields(record, input.select) : null;
+          if (!record) return null;
+
+          const [withUser] = await attachJoinedUsers([record], input.join?.user);
+          return selectFields(withUser, input.select);
         }
 
         const result = await base.findOne(input);
@@ -333,7 +362,8 @@ function wrapMongoAdapter(adapterFactory) {
           if (input.offset) records = records.slice(input.offset);
           if (typeof input.limit === "number") records = records.slice(0, input.limit);
 
-          return records.map((record) => selectFields(record, input.select));
+          const joined = await attachJoinedUsers(records, input.join?.user);
+          return joined.map((record) => selectFields(record, input.select));
         }
 
         const results = await base.findMany(input);
@@ -505,6 +535,17 @@ export async function getAuth() {
           // Both logical tables resolve to `users`; account rows are kept in
           // memory by the wrapper above, so the collection stays clean.
           modelName: "users",
+          // Legacy users were created without `emailVerified`, so the default
+          // `requireLocalEmailVerified: true` blocks linking a Google account
+          // that reuses an existing email (`account_not_linked`). Google already
+          // verifies email ownership, and role/plan remain DB-controlled via
+          // `input: false` above, so implicit linking is safe here.
+          accountLinking: {
+            enabled: true,
+            disableImplicitLinking: false,
+            requireLocalEmailVerified: false,
+            trustedProviders: ["google"],
+          },
         },
         emailAndPassword: {
           enabled: true,
