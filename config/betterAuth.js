@@ -537,6 +537,11 @@ export async function getAuth() {
           // Both logical tables resolve to `users`; account rows are kept in
           // memory by the wrapper above, so the collection stays clean.
           modelName: "users",
+          // Keep the OAuth state in an encrypted cookie instead of secondary
+          // storage. Google login can take minutes (password + consent), and an
+          // in-memory state can vanish on a Render restart or a second instance,
+          // which surfaces as a generic "unexpected" sign-in failure.
+          storeStateStrategy: "cookie",
           // Legacy users were created without `emailVerified`, so the default
           // `requireLocalEmailVerified: true` blocks linking a Google account
           // that reuses an existing email (`account_not_linked`). Google already
