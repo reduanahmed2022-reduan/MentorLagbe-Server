@@ -35,8 +35,6 @@ const bannerFixes = [
   ["Mathematics Tutor Needed for Class 10", "tutor1@example.com", "photo-1635070041078-e363dbe005cb"],
 ];
 
-// Rewrite the two initially Biology-labelled budget batches to the subjects the
-// section actually needs. Matching on the old title keeps this idempotent.
 // Bring three popular mathematics listings into the $500-$800 budget range.
 const feeFixes = [
   ["Algebra Mastery for HSC", "sarah@mentorlagbe.com", 750],
@@ -44,6 +42,16 @@ const feeFixes = [
   ["Calculus Foundations", "sarah@mentorlagbe.com", 800],
 ];
 
+// These three are the ones requested by name, so let them lead the homepage
+// section. Staggering createdAt keeps the API's existing newest-first order.
+const priorityTitles = [
+  ["Algebra Mastery for HSC", "sarah@mentorlagbe.com"],
+  ["Mathematics Tutor Needed for Class 10", "tutor1@example.com"],
+  ["Calculus Foundations", "sarah@mentorlagbe.com"],
+];
+
+// Rewrite the two initially Biology-labelled budget batches to the subjects the
+// section actually needs. Matching on the old title keeps this idempotent.
 const subjectFixes = [
   {
     match: { title: "Cell Biology Essentials", tutorEmail: "ayesha@mentorlagbe.com" },
@@ -139,6 +147,13 @@ async function seedFeaturedTuitions() {
       await tuitions.updateOne(
         { title, tutorEmail },
         { $set: { monthlyFee, approvalStatus: "approved", isActive: true } }
+      );
+    }
+
+    for (const [index, [title, tutorEmail]] of priorityTitles.entries()) {
+      await tuitions.updateOne(
+        { title, tutorEmail, isActive: true },
+        { $set: { createdAt: new Date(now - index * 1000) } }
       );
     }
 
