@@ -158,14 +158,37 @@ async function seedFeaturedTuitions() {
     }
 
     // If the script was run before and after a subject rename, two documents can
-    // share the same title. Keep the oldest live and archive the extras (never
-    // delete data) so the public listing stays at one row per batch.
+    // share the same title. Keep the row owned by the correct featured tutor and
+    // archive the extras (never delete data) so the public listing has one row.
     for (const title of ["Advanced Mathematics Practice", "English Writing Masterclass"]) {
-      const matches = await tuitions.find({ title }).sort({ createdAt: 1 }).toArray();
-      for (const duplicate of matches.slice(1)) {
+      const matches = await tuitions
+        .find({ title: { $in: [title, `${title} (archived duplicate)`] } })
+        .sort({ createdAt: 1 })
+        .toArray();
+      const preferredEmail = batches.find(([batchTitle]) => batchTitle === title)?.[9];
+      const keeper =
+        matches.find((item) => item.tutorEmail === preferredEmail) || matches[0];
+
+      for (const item of matches) {
+        const isKeeper = keeper && item._id.toString() === keeper._id.toString();
+
         await tuitions.updateOne(
-          { _id: duplicate._id },
-          { $set: { title: `${title} (archived duplicate)`, isActive: false } }
+          { _id: item._id },
+          {
+            $set: isKeeper
+              ? {
+                  title,
+                  isActive: true,
+                  approvalStatus: "approved",
+                  ...(preferredEmail
+                    ? {
+                        tutorEmail: preferredEmail,
+                        tutorName: tutors[preferredEmail],
+                      }
+                    : {}),
+                }
+              : { title: `${title} (archived duplicate)`, isActive: false },
+          }
         );
       }
     }
