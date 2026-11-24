@@ -24,6 +24,8 @@ const batches = [
   ["Creative Coding for Kids", "ICT", "Class 8", "Online", "Online", 650, 2, "photo-1526379095098-d400fd0bf935", "A playful introduction to programming through small projects and puzzles.", "sabbir@mentorlagbe.com"],
   ["Biology Basics for Beginners", "Biology", "Class 10", "Offline", "Rajshahi", 700, 3, "photo-1530026405186-ed1f139313f8", "Chapter-wise biology foundations with diagrams and quick revision notes.", "ayesha@mentorlagbe.com"],
   ["Chemistry Quick Revision", "Chemistry", "HSC", "Online", "Online", 780, 3, "photo-1554475901-4538ddfbccc2", "Fast, focused HSC chemistry revision with reaction mechanisms and past questions.", "tanvir@mentorlagbe.com"],
+  ["Advanced Mathematics Practice", "Mathematics", "Class 11", "Online", "Dhaka", 750, 3, "photo-1635070041078-e363dbe005cb", "Exam-focused mathematics practice with step-by-step problem solving.", "sarah@mentorlagbe.com"],
+  ["English Writing Masterclass", "English", "HSC", "Online", "Online", 800, 2, "photo-1503676260728-1c00da094a0b", "Upgrade essays, letters and composition writing with guided feedback.", "rahim@mentorlagbe.com"],
 ];
 
 // Repair banners on existing listings: one URL was a dead Unsplash photo and
@@ -31,6 +33,50 @@ const batches = [
 const bannerFixes = [
   ["Chemistry Quick Revision", "tanvir@mentorlagbe.com", "photo-1554475901-4538ddfbccc2"],
   ["Mathematics Tutor Needed for Class 10", "tutor1@example.com", "photo-1635070041078-e363dbe005cb"],
+];
+
+// Rewrite the two initially Biology-labelled budget batches to the subjects the
+// section actually needs. Matching on the old title keeps this idempotent.
+// Bring three popular mathematics listings into the $500-$800 budget range.
+const feeFixes = [
+  ["Algebra Mastery for HSC", "sarah@mentorlagbe.com", 750],
+  ["Mathematics Tutor Needed for Class 10", "tutor1@example.com", 500],
+  ["Calculus Foundations", "sarah@mentorlagbe.com", 800],
+];
+
+const subjectFixes = [
+  {
+    match: { title: "Cell Biology Essentials", tutorEmail: "ayesha@mentorlagbe.com" },
+    set: {
+      title: "Advanced Mathematics Practice",
+      subject: "Mathematics",
+      classLevel: "Class 11",
+      mode: "Online",
+      location: "Dhaka",
+      monthlyFee: 750,
+      daysPerWeek: 3,
+      bannerImage: image("photo-1635070041078-e363dbe005cb"),
+      description: "Exam-focused mathematics practice with step-by-step problem solving.",
+      tutorName: "Sarah Ahmed",
+      tutorEmail: "sarah@mentorlagbe.com",
+    },
+  },
+  {
+    match: { title: "Human Physiology Crash Course", tutorEmail: "ayesha@mentorlagbe.com" },
+    set: {
+      title: "English Writing Masterclass",
+      subject: "English",
+      classLevel: "HSC",
+      mode: "Online",
+      location: "Online",
+      monthlyFee: 800,
+      daysPerWeek: 2,
+      bannerImage: image("photo-1503676260728-1c00da094a0b"),
+      description: "Upgrade essays, letters and composition writing with guided feedback.",
+      tutorName: "Rahim Hasan",
+      tutorEmail: "rahim@mentorlagbe.com",
+    },
+  },
 ];
 
 async function seedFeaturedTuitions() {
@@ -83,6 +129,30 @@ async function seedFeaturedTuitions() {
         { title, tutorEmail },
         { $set: { bannerImage: image(photoId) } }
       );
+    }
+
+    for (const { match, set } of subjectFixes) {
+      await tuitions.updateOne(match, { $set: set });
+    }
+
+    for (const [title, tutorEmail, monthlyFee] of feeFixes) {
+      await tuitions.updateOne(
+        { title, tutorEmail },
+        { $set: { monthlyFee, approvalStatus: "approved", isActive: true } }
+      );
+    }
+
+    // If the script was run before and after a subject rename, two documents can
+    // share the same title. Keep the oldest live and archive the extras (never
+    // delete data) so the public listing stays at one row per batch.
+    for (const title of ["Advanced Mathematics Practice", "English Writing Masterclass"]) {
+      const matches = await tuitions.find({ title }).sort({ createdAt: 1 }).toArray();
+      for (const duplicate of matches.slice(1)) {
+        await tuitions.updateOne(
+          { _id: duplicate._id },
+          { $set: { title: `${title} (archived duplicate)`, isActive: false } }
+        );
+      }
     }
 
     const total = await tuitions.countDocuments({
