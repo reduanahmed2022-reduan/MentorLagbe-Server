@@ -103,6 +103,11 @@ const escapeRegex = (value) =>
 
       const query = { role: "tutor" };
 
+      // Public catalog only: skip half-empty/test accounts so the homepage
+      // never renders blank circular avatars or missing subject/rate cards.
+      query.subject = { $exists: true, $ne: "" };
+      query.image = { $exists: true, $nin: ["", null] };
+
       // Free-text search across the fields shown on tutor cards.
       if (search && String(search).trim()) {
         const term = escapeRegex(String(search).trim());
