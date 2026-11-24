@@ -13,6 +13,7 @@ import bookmarkRoutes from "./routes/bookmarkRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
 import { toNodeHandler } from "better-auth/node";
 import {
   BETTER_AUTH_BASE_PATH,
@@ -69,6 +70,7 @@ app.use("/api/applications", applicationRoutes);
 app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Safety net: BetterAuth's default OAuth error page lives on this API origin,
 // and in production it falls back to `/` — that is what strands the browser on
