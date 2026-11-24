@@ -2,8 +2,8 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/db.js";
 
-// Free students may keep two applications waiting for review at a time.
-const FREE_STUDENT_APPLY_LIMIT = 2;
+// Note: the assignment only caps free tutors' posts and free students'
+// bookmarks — there is no cap on submitted applications.
 
 /**
  * Tutor ownership can be stale on legacy application snapshots (for example a
@@ -138,22 +138,6 @@ export const applyToTuition = async (req, res) => {
         success: false,
         message: "You have already applied to this tuition",
       });
-    }
-
-    // Free students can keep two applications waiting for review at a time.
-    // Accepted/rejected rows are not pending, so they do not consume a slot.
-    if (student.plan !== "pro") {
-      const pendingCount = await db.collection("applications").countDocuments({
-        studentEmail: student.email,
-        status: "pending",
-      });
-
-      if (pendingCount >= FREE_STUDENT_APPLY_LIMIT) {
-        return res.status(403).json({
-          success: false,
-          message: "Free plan allows up to 2 pending applications at a time",
-        });
-      }
     }
 
     // Create Application
