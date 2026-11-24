@@ -1,5 +1,6 @@
 import express from "express";
 import multer from "multer";
+import { createHash } from "crypto";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -108,16 +109,23 @@ router.post(
       });
       if (!response.ok) {
         const upstreamText = await response.text().catch(() => "");
+        // A short, non-reversible fingerprint helps tell a wrong API key from
+        // an ImgBB IP/host block without ever exposing the key itself.
+        const keyFingerprint = createHash("sha256")
+          .update(process.env.IMGBB_API_KEY || "")
+          .digest("hex")
+          .slice(0, 8);
         console.error(
           "ImgBB HTTP error:",
           response.status,
+          "key=" + keyFingerprint,
           upstreamText.slice(0, 500)
         );
         return res.status(502).json({
           success: false,
           message: upstreamText.trim()
-            ? `Image host returned ${response.status}: ${upstreamText.trim().slice(0, 200)}`
-            : `Image host returned ${response.status}`,
+            ? `Image host returned ${response.status} (key=${keyFingerprint}): ${upstreamText.trim().slice(0, 160)}`
+            : `Image host returned ${response.status} (key=${keyFingerprint})`,
         });
       }
 
