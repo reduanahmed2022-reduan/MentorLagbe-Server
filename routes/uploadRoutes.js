@@ -46,7 +46,7 @@ const hasImageSignature = (buffer) => {
   ); // WebP
 };
 
-// Keep the client-supplied name from influencing the ImgBB form: drop any path
+// Keep the client-supplied name from influencing the upload form: drop path
 // components and unsafe characters, and bound its length before use.
 const sanitizeUploadName = (originalName) => {
   const base = String(originalName ?? "").split(/[\\/]/).pop() ?? "";
@@ -63,22 +63,106 @@ const sanitizeUploadName = (originalName) => {
   return `${stem.slice(0, maxLength - extension.length)}${extension}`;
 };
 
-const requireImgBB = (req, res, next) => {
-  if (!process.env.IMGBB_API_KEY) {
+const cloudinaryConfigured = () =>
+  Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_UPLOAD_PRESET);
+
+const requireUploadProvider = (req, res, next) => {
+  if (!process.env.IMGBB_API_KEY && !cloudinaryConfigured()) {
     return res.status(503).json({
       success: false,
-      message: "ImgBB is not configured. Please set IMGBB_API_KEY.",
+      message:
+        "Image upload is not configured. Set IMGBB_API_KEY or CLOUDINARY_CLOUD_NAME + CLOUDINARY_UPLOAD_PRESET.",
     });
   }
 
   return next();
 };
 
-// Upload an image file directly to ImgBB and return the hosted URL.
+const timeoutSignal = () => AbortSignal.timeout(45000);
+
+/** Primary provider: ImgBB. Throws with a readable reason on any failure. */
+async function uploadToImgBB(file) {
+  const form = new FormData();
+  form.append("key", process.env.IMGBB_API_KEY);
+  form.append("image", file.buffer.toString("base64"));
+  form.append("name", `${Date.now()}-${sanitizeUploadName(file.originalname)}`);
+
+  const response = await fetch("https://api.imgbb.com/1/upload", {
+    method: "POST",
+    body: form,
+    signal: timeoutSignal(),
+  });
+
+  if (!response.ok) {
+    const upstreamText = await response.text().catch(() => "");
+    const fingerprint = createHash("sha256")
+      .update(process.env.IMGBB_API_KEY || "")
+      .digest("hex")
+      .slice(0, 8);
+    const detail = upstreamText.trim().slice(0, 160);
+    console.error("ImgBB HTTP error:", response.status, "key=" + fingerprint, upstreamText.slice(0, 500));
+
+    const error = new Error(
+      detail
+        ? `Image host returned ${response.status} (key=${fingerprint}): ${detail}`
+        : `Image host returned ${response.status} (key=${fingerprint})`
+    );
+    error.status = response.status;
+    throw error;
+  }
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!result.success || !result.data?.url) {
+    const detail = typeof result.error?.message === "string" ? result.error.message : "";
+    console.error("ImgBB rejected upload:", detail || JSON.stringify(result.error || {}));
+    const error = new Error(detail ? `Image host rejected the upload: ${detail}` : "Image upload failed");
+    error.status = 502;
+    throw error;
+  }
+
+  return { url: result.data.url, deleteUrl: result.data.delete_url || "" };
+}
+
+/**
+ * Fallback provider: Cloudinary unsigned upload. The assignment allows
+ * ImgBB or Cloudinary, so a blocked ImgBB host never breaks the feature.
+ */
+async function uploadToCloudinary(file) {
+  if (!cloudinaryConfigured()) return null;
+
+  const form = new FormData();
+  form.append(
+    "file",
+    new Blob([file.buffer], { type: file.mimetype || "image/jpeg" }),
+    sanitizeUploadName(file.originalname)
+  );
+  form.append("upload_preset", process.env.CLOUDINARY_UPLOAD_PRESET);
+  form.append("folder", "mentorlagbe");
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: "POST", body: form, signal: timeoutSignal() }
+  );
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || !result.secure_url) {
+    const error = new Error(
+      result.error?.message || `Cloudinary returned ${response.status}`
+    );
+    error.status = response.status;
+    throw error;
+  }
+
+  return { url: result.secure_url, deleteUrl: "" };
+}
+
+// Upload an image file and return the hosted URL (ImgBB, then Cloudinary).
 router.post(
   "/image",
   verifyToken,
-  requireImgBB,
+  requireUploadProvider,
   upload.single("image"),
   async (req, res) => {
     try {
@@ -96,68 +180,43 @@ router.post(
         });
       }
 
-      const form = new FormData();
-      form.append("key", process.env.IMGBB_API_KEY);
-      form.append("image", req.file.buffer.toString("base64"));
-      form.append("name", `${Date.now()}-${sanitizeUploadName(req.file.originalname)}`);
+      let hosted = null;
+      let imgbbError = "";
 
-      const response = await fetch("https://api.imgbb.com/1/upload", {
-        method: "POST",
-        body: form,
-        // Generous timeout: image uploads on mobile links can take a while.
-        signal: AbortSignal.timeout(45000),
-      });
-      if (!response.ok) {
-        const upstreamText = await response.text().catch(() => "");
-        // A short, non-reversible fingerprint helps tell a wrong API key from
-        // an ImgBB IP/host block without ever exposing the key itself.
-        const keyFingerprint = createHash("sha256")
-          .update(process.env.IMGBB_API_KEY || "")
-          .digest("hex")
-          .slice(0, 8);
-        console.error(
-          "ImgBB HTTP error:",
-          response.status,
-          "key=" + keyFingerprint,
-          upstreamText.slice(0, 500)
-        );
-        return res.status(502).json({
-          success: false,
-          message: upstreamText.trim()
-            ? `Image host returned ${response.status} (key=${keyFingerprint}): ${upstreamText.trim().slice(0, 160)}`
-            : `Image host returned ${response.status} (key=${keyFingerprint})`,
-        });
+      if (process.env.IMGBB_API_KEY) {
+        try {
+          hosted = await uploadToImgBB(req.file);
+        } catch (error) {
+          imgbbError = error.message;
+          console.error("ImgBB upload failed:", error.message);
+        }
       }
 
-      let result;
-      try {
-        result = await response.json();
-      } catch {
-        return res.status(502).json({
-          success: false,
-          message: "Image host returned an invalid response",
-        });
+      if (!hosted && cloudinaryConfigured()) {
+        try {
+          hosted = await uploadToCloudinary(req.file);
+        } catch (error) {
+          console.error("Cloudinary fallback failed:", error.message);
+          imgbbError = `${imgbbError ? `${imgbbError} ` : ""}Cloudinary fallback: ${error.message}`;
+        }
       }
 
-      if (!result.success || !result.data?.url) {
-        const upstreamMessage =
-          typeof result.error?.message === "string" ? result.error.message : "";
-        console.error("ImgBB rejected upload:", upstreamMessage || JSON.stringify(result.error || {}));
+      if (!hosted) {
         return res.status(502).json({
           success: false,
-          message: upstreamMessage
-            ? `Image host rejected the upload: ${upstreamMessage}`
-            : "Image upload failed. Please try another image.",
+          message:
+            imgbbError ||
+            "Image upload failed. Configure IMGBB_API_KEY or Cloudinary upload settings.",
         });
       }
 
       return res.status(200).json({
         success: true,
-        imageUrl: result.data.url,
-        deleteUrl: result.data.delete_url,
+        imageUrl: hosted.url,
+        deleteUrl: hosted.deleteUrl,
       });
     } catch (error) {
-      console.error("ImgBB Upload Error:", error.message);
+      console.error("Image Upload Error:", error.message);
 
       if (error.name === "TimeoutError" || error.name === "AbortError") {
         return res.status(504).json({

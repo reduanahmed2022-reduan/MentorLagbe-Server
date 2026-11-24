@@ -45,7 +45,7 @@ Tutor: `sarah@mentorlagbe.com` / `Tutor@12345` · Student: `student1@mentorlagbe
 | Google OAuth | ✅ | `/api/auth/google/start` → `/api/better-auth/callback/google` |
 | JWT + bcrypt auth | ✅ | `jsonwebtoken`, `bcryptjs`, `middleware/authMiddleware.js` |
 | Stripe payment gateway | ✅ | Checkout, webhook & verify — `config/stripe.js` |
-| ImgBB image upload | ✅ | `multer` memory storage → ImgBB |
+| ImgBB image upload (with Cloudinary fallback) | ✅ | `multer` memory storage → ImgBB → Cloudinary |
 | CORS for deployed client | ✅ | `CLIENT_URL` allowlist (`https://mentorlagbe-client-weld.vercel.app`) |
 | Role-based access (student/tutor/admin) | ✅ | Bearer + role middleware |
 | Live deployment | ✅ | Render (this API) + Vercel (client) |
@@ -61,7 +61,7 @@ Tutor: `sarah@mentorlagbe.com` / `Tutor@12345` · Student: `student1@mentorlagbe
 - ✅ **Moderation workflow** — tutors post tuitions; admins approve or reject before they go live.
 - 📝 **Applications** — students apply once per tuition, tutors accept/reject, admins see everything.
 - 💳 **Stripe Subscriptions** — recurring monthly Pro plans (student **$10/mo**, tutor **$15/mo**) via `mode: "subscription"` Checkout, signed webhook for activation, renewals (`invoice.paid`) and cancellation, plus idempotent verification.
-- 🖼️ **ImgBB uploads** — in-memory `multer` (max 5 MB), signature checked, returns image + delete URLs.
+- 🖼️ **ImgBB uploads** — in-memory `multer` (max 5 MB), signature checked, returns image + delete URLs. If ImgBB blocks the deployment host, the API automatically falls back to Cloudinary when `CLOUDINARY_CLOUD_NAME` + `CLOUDINARY_UPLOAD_PRESET` (unsigned preset) are configured.
 - 📊 **Admin endpoints** — stats, user role management, tuition queue, payment transactions.
 - 🛡️ **Hardened production behavior** — JSON 404s for unknown API routes, normalized error handler, CORS allowlist, startup env validation.
 
@@ -130,7 +130,8 @@ Copy `.env.example`; **never commit `.env`** and never expose these in the Verce
 | `CLIENT_URL` | Comma-separated allowed origins. In production Stripe uses the first non-localhost origin; locally it uses the first entry. Live value: `https://mentorlagbe-client-weld.vercel.app`. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth keys; both blank disables Google sign-in. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe Checkout + signed webhooks. |
-| `IMGBB_API_KEY` | Image uploads. |
+| `IMGBB_API_KEY` | Primary image upload provider. |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_UPLOAD_PRESET` | Optional fallback when ImgBB rejects the host. Use an unsigned upload preset. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | Seed defaults: `admin@mentorlagbe.com` / `Admin@12345` / `MentorLagbe Admin`. |
 
 ```env
@@ -147,6 +148,8 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 IMGBB_API_KEY=your_imgbb_key
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_UPLOAD_PRESET=
 ADMIN_EMAIL=admin@mentorlagbe.com
 ADMIN_PASSWORD=Admin@12345
 ADMIN_NAME=MentorLagbe Admin
