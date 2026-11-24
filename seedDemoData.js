@@ -50,18 +50,21 @@ async function upsertUser(users, user, role, password, extra = {}) {
   await users.updateOne(
     { email: user.email },
     {
-      $setOnInsert: {
+      $set: {
         name: user.name,
-        email: user.email,
-        password: await bcrypt.hash(password, 12),
         role,
         phone: user.phone || "",
         bio: user.bio || "",
         plan: user.plan || "free",
+        ...extra,
+      },
+      // Never overwrite an existing password or creation date.
+      $setOnInsert: {
+        email: user.email,
+        password: await bcrypt.hash(password, 12),
         profileImage: "",
         image: "",
         createdAt: new Date(),
-        ...extra,
       },
     },
     { upsert: true }
@@ -128,9 +131,16 @@ async function seed() {
       createdAt: new Date(now - insertedTuitions.length * 86400000),
     };
 
+    const { createdAt, ...tuitionFields } = document;
+
+    // `$setOnInsert` alone would leave dead banners and stale plans on rows
+    // created by an earlier seed run, so refresh demo-owned fields every time.
     await tuitionsCollection.updateOne(
       { title, tutorEmail },
-      { $set: { approvalStatus }, $setOnInsert: document },
+      {
+        $set: { ...tuitionFields, approvalStatus },
+        $setOnInsert: { createdAt },
+      },
       { upsert: true }
     );
 
