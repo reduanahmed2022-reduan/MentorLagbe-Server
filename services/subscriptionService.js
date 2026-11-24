@@ -30,13 +30,19 @@ export async function activateSubscription(session) {
     return { activated: false, reason: "user_not_found" };
   }
 
-  const plan = PRO_PLANS[user.role];
-  const expectedAmount = plan?.amount;
+  // Validate against the role/plan signed into Stripe metadata at checkout.
+  // The user's current role may have changed before the webhook arrives, and a
+  // missing signed plan must never silently skip amount validation.
+  const signedRole = metadata.userRole || user.role;
+  const plan = PRO_PLANS[signedRole];
+
+  if (!plan || (metadata.planName && metadata.planName !== plan.name)) {
+    return { activated: false, reason: "invalid_plan" };
+  }
 
   if (
-    expectedAmount &&
-    (session.amount_total !== expectedAmount ||
-      (session.currency || "").toLowerCase() !== plan.currency)
+    session.amount_total !== plan.amount ||
+    (session.currency || "").toLowerCase() !== plan.currency
   ) {
     return { activated: false, reason: "invalid_amount" };
   }
@@ -44,8 +50,8 @@ export async function activateSubscription(session) {
   const payment = {
     userEmail: user.email,
     userName: user.name,
-    userRole: user.role,
-    planName: metadata.planName || "Pro Plan",
+    userRole: signedRole,
+    planName: metadata.planName || plan.name,
     amount: (session.amount_total || 0) / 100,
     currency: (session.currency || "usd").toUpperCase(),
     transactionId:

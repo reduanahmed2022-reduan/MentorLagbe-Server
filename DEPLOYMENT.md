@@ -30,7 +30,7 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 | --- | --- | --- |
 | `PORT` | `5000` | No action needed — let the host inject it. |
 | `JWT_EXPIRES_IN` | `7d` | Tokens use a 7-day lifetime; no startup impact. |
-| `CLIENT_URL` | `http://localhost:3000` | Server still boots, but CORS and Stripe redirects point at localhost — **set this in production**. May be comma-separated for CORS, but **Stripe redirects use only the first origin**; put the production client origin first. |
+| `CLIENT_URL` | `http://localhost:3000` | Server still boots, but CORS and Stripe redirects point at localhost — **set this in production**. May be comma-separated for CORS; **Stripe redirects use the first non-localhost origin in production** (first entry locally), so put the production client origin in the list. |
 | `STRIPE_SECRET_KEY` | — | Checkout/payment endpoints return `503` ("Stripe is not configured"). Needed only for Pro-plan payments. |
 | `STRIPE_WEBHOOK_SECRET` | — | `POST /api/payments/webhook` returns `503` ("Stripe webhook is not configured"). Set it together with `STRIPE_SECRET_KEY`. |
 | `IMGBB_API_KEY` | — | `/api/upload/image` returns `503` ("ImgBB is not configured"). Needed only for image uploads. |

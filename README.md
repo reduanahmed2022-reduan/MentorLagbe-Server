@@ -108,6 +108,7 @@ npm run seed
 | `npm run dev` | `node --watch index.js` |
 | `npm start` | Production entry point |
 | `npm run seed` | Full demo dataset |
+| `npm run seed:featured` | Budget-featured batches used by the homepage section |
 | `npm run seed:admin` | Admin account only (needs `ADMIN_EMAIL` + `ADMIN_PASSWORD`) |
 | `npm run seed:tutors` | Tutor catalog only |
 | `node scripts/verify-env.mjs` | Pre-deploy environment check |
@@ -126,7 +127,7 @@ Copy `.env.example`; **never commit `.env`** and never expose these in the Verce
 | `JWT_EXPIRES_IN` | Token lifetime; default `7d`. |
 | `BETTER_AUTH_SECRET` | BetterAuth secret; required by the deploy preflight. |
 | `BETTER_AUTH_URL` | **API origin** used for callbacks: local `http://localhost:5000`, live `https://mentorlagbe-server-q3fr.onrender.com`. |
-| `CLIENT_URL` | Comma-separated allowed origins; also the first entry drives Stripe redirects. Live value: `https://mentorlagbe-client-weld.vercel.app`. |
+| `CLIENT_URL` | Comma-separated allowed origins. In production Stripe uses the first non-localhost origin; locally it uses the first entry. Live value: `https://mentorlagbe-client-weld.vercel.app`. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth keys; both blank disables Google sign-in. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe Checkout + signed webhooks. |
 | `IMGBB_API_KEY` | Image uploads. |

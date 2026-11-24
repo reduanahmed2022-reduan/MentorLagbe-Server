@@ -15,9 +15,9 @@ const tutors = [
   { name: "Sarah Ahmed", email: "sarah@mentorlagbe.com", plan: "pro", phone: "+8801711000001", bio: "Mathematics specialist with 8 years of teaching experience." },
   { name: "Rahim Hasan", email: "rahim@mentorlagbe.com", plan: "free", phone: "+8801711000002", bio: "English and IELTS mentor helping students build confidence." },
   { name: "Nusrat Jahan", email: "nusrat@mentorlagbe.com", plan: "pro", phone: "+8801711000003", bio: "Physics educator who makes difficult concepts simple." },
-  { name: "Sabbir Hossain", email: "sabbir@mentorlagbe.com", plan: "free", phone: "+8801711000004", bio: "Full-stack developer teaching practical programming." },
+  { name: "Sabbir Hossain", email: "sabbir@mentorlagbe.com", plan: "pro", phone: "+8801711000004", bio: "Full-stack developer teaching practical programming." },
   { name: "Ayesha Rahman", email: "ayesha@mentorlagbe.com", plan: "pro", phone: "+8801711000005", bio: "Biology mentor focused on exam-oriented learning." },
-  { name: "Tanvir Ahmed", email: "tanvir@mentorlagbe.com", plan: "free", phone: "+8801711000006", bio: "Chemistry tutor with a knack for real-life examples." },
+  { name: "Tanvir Ahmed", email: "tanvir@mentorlagbe.com", plan: "pro", phone: "+8801711000006", bio: "Chemistry tutor with a knack for real-life examples." },
 ];
 
 const students = [
@@ -40,7 +40,7 @@ const tuitions = [
   ["Python for Absolute Beginners", "ICT", "SSC", "Online", "Online", 3000, 2, "photo-1526379095098-d400fd0bf935", "A friendly introduction to programming with Python.", "sabbir@mentorlagbe.com", "approved"],
   ["Biology for Medical Entrance", "Biology", "HSC", "Offline", "Sylhet", 3800, 4, "photo-1530026405186-ed1f139313f8", "Chapter-wise medical entrance preparation with diagrams.", "ayesha@mentorlagbe.com", "approved"],
   ["Genetics & Evolution", "Biology", "University", "Online", "Online", 4200, 2, "photo-1532187863486-abf9dbad1b69", "Understand inheritance, DNA and evolution with examples.", "ayesha@mentorlagbe.com", "approved"],
-  ["Organic Chemistry Essentials", "Chemistry", "HSC", "Offline", "Khulna", 3200, 3, "photo-1532634896-26909d0d4b9a", "Reaction mechanisms made easy with practice sheets.", "tanvir@mentorlagbe.com", "approved"],
+  ["Organic Chemistry Essentials", "Chemistry", "HSC", "Offline", "Khulna", 3200, 3, "photo-1554475901-4538ddfbccc2", "Reaction mechanisms made easy with practice sheets.", "tanvir@mentorlagbe.com", "approved"],
   ["Chemistry for JEE / Engineering", "Chemistry", "University", "Online", "Online", 4800, 3, "photo-1554475901-4538ddfbccc2", "Structured problem solving for competitive exams.", "tanvir@mentorlagbe.com", "approved"],
   ["Business Statistics for Beginners", "Mathematics", "Adult", "Online", "Online", 3600, 2, "photo-1551288049-bebda4e38f71", "Practical statistics for everyday business decisions.", "sarah@mentorlagbe.com", "pending"],
   ["Data Science Bootcamp", "ICT", "Adult", "Online", "Online", 6500, 3, "photo-1551288049-bebda4e38f71", "An intensive introduction to data analysis with Python.", "sabbir@mentorlagbe.com", "rejected"],

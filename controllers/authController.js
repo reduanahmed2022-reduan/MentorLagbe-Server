@@ -4,22 +4,34 @@ import { getDB } from "../config/db.js";
 import { ObjectId } from "mongodb";
 import { getAuth, isBetterAuthConfigured } from "../config/betterAuth.js";
 
+const isNonEmptyString = (value) =>
+  typeof value === "string" && value.trim().length > 0;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !password || !role) {
+    // Validate required fields and their types before calling .trim()/.toLowerCase().
+    if (![name, email, password, role].every(isNonEmptyString)) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required",
+        message: "All fields are required and must be text",
+      });
+    }
+
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address",
       });
     }
 
     // Validate user role
     const allowedRoles = ["student", "tutor"];
 
-    if (!allowedRoles.includes(role.toLowerCase())) {
+    if (!allowedRoles.includes(role.trim().toLowerCase())) {
       return res.status(400).json({
         success: false,
         message: "Invalid role. Choose student or tutor",
@@ -27,10 +39,10 @@ export const registerUser = async (req, res) => {
     }
 
     // Validate password
-    if (password.length < 8) {
+    if (password.length < 8 || password.length > 128) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters",
+        message: "Password must be between 8 and 128 characters",
       });
     }
 
@@ -183,11 +195,18 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate required fields
-    if (!email || !password) {
+    // Validate required fields and their types.
+    if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required",
+        message: "Email and password are required and must be text",
+      });
+    }
+
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address",
       });
     }
 
@@ -214,6 +233,11 @@ export const loginUser = async (req, res) => {
         // Fall back to the legacy bcrypt check below. Seeded users have no
         // persistent account document, so their credentials are synthesized
         // from users.password inside the BetterAuth adapter wrapper.
+        const detail = error instanceof Error ? error.message : String(error);
+        const expectedCredentialFailure = /invalid|not found|unauthorized|password|email/i.test(detail);
+        if (!expectedCredentialFailure) {
+          console.error("BetterAuth sign-in fallback:", detail);
+        }
       }
     }
 

@@ -122,6 +122,14 @@ app.use("/api", (req, res) => {
   });
 });
 
+// Unknown non-API URLs should also return JSON, not Express's default HTML.
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
 // Centralized error handler (CORS, malformed JSON, unexpected errors).
 app.use((error, req, res, next) => {
   // BetterAuth streams its responses; never try to write a second response.
@@ -244,6 +252,17 @@ async function startServer() {
 
     process.once("SIGTERM", () => shutdown("SIGTERM"));
     process.once("SIGINT", () => shutdown("SIGINT"));
+
+    // Express 5 handles route rejections, but background work can still produce
+    // an unhandled rejection. Log it instead of crashing the whole instance.
+    process.on("unhandledRejection", (reason) => {
+      console.error("Unhandled rejection:", reason instanceof Error ? reason.message : reason);
+    });
+
+    process.on("uncaughtException", (error) => {
+      console.error("Uncaught exception:", error.message);
+      shutdown("uncaughtException");
+    });
   } catch (error) {
     console.error("Failed to start server:", error.message);
     process.exit(1);

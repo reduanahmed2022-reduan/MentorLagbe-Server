@@ -633,6 +633,7 @@ export const getAllTuitions = async (req, res) => {
       location,
       minFee,
       maxFee,
+      sort,
       page,
       limit,
     } = req.query;
@@ -744,6 +745,24 @@ export const getAllTuitions = async (req, res) => {
       }
     }
 
+    // Sorting must happen before pagination, otherwise "fee: low to high"
+    // only reorders the current page while cheaper rows stay on later pages.
+    const allowedSorts = ["newest", "fee-low", "fee-high"];
+
+    if (sort !== undefined && (typeof sort !== "string" || !allowedSorts.includes(sort))) {
+      return res.status(400).json({
+        success: false,
+        message: "sort must be newest, fee-low or fee-high",
+      });
+    }
+
+    const sortOption =
+      sort === "fee-low"
+        ? { monthlyFee: 1, createdAt: -1 }
+        : sort === "fee-high"
+          ? { monthlyFee: -1, createdAt: -1 }
+          : { createdAt: -1 };
+
     // Optional server-side pagination. Each parameter falls back independently
     // so `?limit=6` (home sections) and `?page=2` both work as expected.
     const hasPagination = page !== undefined || limit !== undefined;
@@ -768,7 +787,7 @@ export const getAllTuitions = async (req, res) => {
     const tuitionsCollection = db.collection("tuitions");
     const total = await tuitionsCollection.countDocuments(filter);
 
-    const query = tuitionsCollection.find(filter).sort({ createdAt: -1 });
+    const query = tuitionsCollection.find(filter).sort(sortOption);
 
     if (hasPagination) {
       query.skip((pageNumber - 1) * pageSize);
@@ -1187,6 +1206,13 @@ export const toggleTuitionStatus = async (req, res) => {
       });
     }
 
+    if (!ObjectId.isValid(req.user.userId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authenticated user",
+      });
+    }
+
     const db = getDB();
 
     const tutor = await db.collection("users").findOne({
@@ -1213,10 +1239,17 @@ export const toggleTuitionStatus = async (req, res) => {
       });
     }
 
+    if (tuition.approvalStatus !== "approved") {
+      return res.status(409).json({
+        success: false,
+        message: "Only approved tuitions can be opened or closed",
+      });
+    }
+
     const isActive = !tuition.isActive;
 
     await db.collection("tuitions").updateOne(
-      { _id: tuition._id },
+      { _id: tuition._id, tutorEmail: tutor.email, approvalStatus: "approved" },
       { $set: { isActive, updatedAt: new Date() } }
     );
 

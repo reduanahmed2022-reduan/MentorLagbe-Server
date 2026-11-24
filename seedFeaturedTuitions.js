@@ -19,13 +19,13 @@ const image = (id) =>
 
 const batches = [
   ["Primary Mathematics Basics", "Mathematics", "Class 5", "Online", "Dhaka", 500, 2, "photo-1509062522246-3755977927d7", "Friendly foundational math classes with plenty of guided practice.", "sarah@mentorlagbe.com"],
-  ["English Conversation Club", "English", "SSC", "Online", "Online", 550, 2, "photo-1513258496099-48168024aec0", "Build everyday speaking confidence through interactive conversation drills.", "rahim@mentorlagbe.com"],
+  ["English Conversation Club", "English", "SSC", "Online", "Online", 550, 2, "photo-1513258496099-48168024aec0", "Build everyday speaking confidence through interactive conversation drills.", "sarah@mentorlagbe.com"],
   ["Junior Physics Made Easy", "Physics", "Class 9", "Offline", "Sylhet", 600, 3, "photo-1636466497217-26a8cbeaf0aa", "Core physics concepts explained with simple examples and homework support.", "nusrat@mentorlagbe.com"],
   ["Creative Coding for Kids", "ICT", "Class 8", "Online", "Online", 650, 2, "photo-1526379095098-d400fd0bf935", "A playful introduction to programming through small projects and puzzles.", "sabbir@mentorlagbe.com"],
   ["Biology Basics for Beginners", "Biology", "Class 10", "Offline", "Rajshahi", 700, 3, "photo-1530026405186-ed1f139313f8", "Chapter-wise biology foundations with diagrams and quick revision notes.", "ayesha@mentorlagbe.com"],
   ["Chemistry Quick Revision", "Chemistry", "HSC", "Online", "Online", 780, 3, "photo-1554475901-4538ddfbccc2", "Fast, focused HSC chemistry revision with reaction mechanisms and past questions.", "tanvir@mentorlagbe.com"],
   ["Advanced Mathematics Practice", "Mathematics", "Class 11", "Online", "Dhaka", 750, 3, "photo-1635070041078-e363dbe005cb", "Exam-focused mathematics practice with step-by-step problem solving.", "sarah@mentorlagbe.com"],
-  ["English Writing Masterclass", "English", "HSC", "Online", "Online", 800, 2, "photo-1503676260728-1c00da094a0b", "Upgrade essays, letters and composition writing with guided feedback.", "rahim@mentorlagbe.com"],
+  ["English Writing Masterclass", "English", "HSC", "Online", "Online", 800, 2, "photo-1503676260728-1c00da094a0b", "Upgrade essays, letters and composition writing with guided feedback.", "sarah@mentorlagbe.com"],
 ];
 
 // Repair banners on existing listings: one URL was a dead Unsplash photo and
@@ -81,8 +81,8 @@ const subjectFixes = [
       daysPerWeek: 2,
       bannerImage: image("photo-1503676260728-1c00da094a0b"),
       description: "Upgrade essays, letters and composition writing with guided feedback.",
-      tutorName: "Rahim Hasan",
-      tutorEmail: "rahim@mentorlagbe.com",
+      tutorName: "Sarah Ahmed",
+      tutorEmail: "sarah@mentorlagbe.com",
     },
   },
 ];
