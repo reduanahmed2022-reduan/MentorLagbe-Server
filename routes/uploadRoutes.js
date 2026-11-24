@@ -107,9 +107,17 @@ router.post(
         signal: AbortSignal.timeout(45000),
       });
       if (!response.ok) {
+        const upstreamText = await response.text().catch(() => "");
+        console.error(
+          "ImgBB HTTP error:",
+          response.status,
+          upstreamText.slice(0, 500)
+        );
         return res.status(502).json({
           success: false,
-          message: "Image host rejected the upload",
+          message: upstreamText.trim()
+            ? `Image host returned ${response.status}: ${upstreamText.trim().slice(0, 200)}`
+            : `Image host returned ${response.status}`,
         });
       }
 
