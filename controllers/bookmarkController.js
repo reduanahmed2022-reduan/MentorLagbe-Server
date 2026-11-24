@@ -13,6 +13,46 @@ async function findStudent(db, req) {
   });
 }
 
+// Bookmarks are embedded in the student's `users` document. Only tuitions that
+// are currently approved + active count toward the visible list and the free
+// plan's slot budget; closed or unapproved batches stay saved but consume no slot.
+async function getVisibleBookmarks(db, student) {
+  const bookmarks = Array.isArray(student.bookmarks) ? student.bookmarks : [];
+
+  const validIds = bookmarks
+    .filter((bookmark) => ObjectId.isValid(bookmark.tuitionId))
+    .map((bookmark) => new ObjectId(bookmark.tuitionId));
+
+  const liveTuitions = validIds.length
+    ? await db
+        .collection("tuitions")
+        .find({
+          _id: { $in: validIds },
+          approvalStatus: "approved",
+          isActive: true,
+        })
+        .toArray()
+    : [];
+
+  const tuitionById = new Map(
+    liveTuitions.map((tuition) => [tuition._id.toString(), tuition])
+  );
+
+  const bookmarkTime = (bookmark) => {
+    const time = Date.parse(bookmark.bookmarkedAt);
+    return Number.isFinite(time) ? time : 0;
+  };
+
+  return bookmarks
+    .slice()
+    .sort((a, b) => bookmarkTime(b) - bookmarkTime(a))
+    .map((bookmark) => ({
+      ...bookmark,
+      tuition: tuitionById.get(bookmark.tuitionId) || null,
+    }))
+    .filter((bookmark) => bookmark.tuition);
+}
+
 // Student: List my bookmarks (only batches still visible to students)
 export const getMyBookmarks = async (req, res) => {
   try {
@@ -26,39 +66,9 @@ export const getMyBookmarks = async (req, res) => {
       });
     }
 
-    const bookmarks = await db
-      .collection("bookmarks")
-      .find({ studentEmail: student.email })
-      .sort({ bookmarkedAt: -1 })
-      .toArray();
-
-    const validIds = bookmarks
-      .filter((bookmark) => ObjectId.isValid(bookmark.tuitionId))
-      .map((bookmark) => new ObjectId(bookmark.tuitionId));
-
-    const liveTuitions = validIds.length
-      ? await db
-          .collection("tuitions")
-          .find({
-            _id: { $in: validIds },
-            approvalStatus: "approved",
-            isActive: true,
-          })
-          .toArray()
-      : [];
-
-    const tuitionById = new Map(
-      liveTuitions.map((tuition) => [tuition._id.toString(), tuition])
-    );
-
     // A closed or unapproved batch is not shown, but its bookmark is kept so it
     // reappears if the tutor reopens it after a fresh approval.
-    const visibleBookmarks = bookmarks
-      .map((bookmark) => ({
-        ...bookmark,
-        tuition: tuitionById.get(bookmark.tuitionId) || null,
-      }))
-      .filter((bookmark) => bookmark.tuition);
+    const visibleBookmarks = await getVisibleBookmarks(db, student);
 
     return res.status(200).json({
       success: true,
@@ -97,12 +107,10 @@ export const checkBookmark = async (req, res) => {
       });
     }
 
-    const bookmark = await db.collection("bookmarks").findOne(
-      {
-        tuitionId,
-        studentEmail: student.email,
-      },
-      { projection: { _id: 1 } }
+    const bookmarks = Array.isArray(student.bookmarks) ? student.bookmarks : [];
+    const normalizedId = String(tuitionId).toLowerCase();
+    const bookmark = bookmarks.find(
+      (item) => String(item.tuitionId).toLowerCase() === normalizedId
     );
 
     return res.status(200).json({
@@ -154,32 +162,8 @@ export const addBookmark = async (req, res) => {
       });
     }
 
-    const existingBookmark = await db.collection("bookmarks").findOne({
-      tuitionId: tuition._id.toString(),
-      studentEmail: student.email,
-    });
-
-    if (existingBookmark) {
-      return res.status(409).json({
-        success: false,
-        message: "Tuition is already bookmarked",
-      });
-    }
-
-    if (student.plan !== "pro") {
-      const count = await db.collection("bookmarks").countDocuments({
-        studentEmail: student.email,
-      });
-
-      if (count >= FREE_STUDENT_BOOKMARK_LIMIT) {
-        return res.status(403).json({
-          success: false,
-          message: "Free plan allows up to 5 bookmarks",
-        });
-      }
-    }
-
     const bookmark = {
+      _id: new ObjectId(),
       tuitionId: tuition._id.toString(),
       tuitionTitle: tuition.title,
       subject: tuition.subject,
@@ -191,12 +175,63 @@ export const addBookmark = async (req, res) => {
       bookmarkedAt: new Date(),
     };
 
-    const result = await db.collection("bookmarks").insertOne(bookmark);
+    const existingBookmark = (Array.isArray(student.bookmarks) ? student.bookmarks : [])
+      .find((item) => item.tuitionId === bookmark.tuitionId);
+
+    if (existingBookmark) {
+      return res.status(409).json({
+        success: false,
+        message: "Tuition is already bookmarked",
+      });
+    }
+
+    if (student.plan !== "pro") {
+      // Bug fix: count only bookmarks whose tuition is still approved + active.
+      // Stale or closed batches must not consume one of the five free slots.
+      const count = (await getVisibleBookmarks(db, student)).length;
+
+      if (count >= FREE_STUDENT_BOOKMARK_LIMIT) {
+        return res.status(403).json({
+          success: false,
+          message: "Free plan allows up to 5 bookmarks",
+        });
+      }
+    }
+
+    // The $ne guard makes the duplicate check atomic per user, so concurrent
+    // requests cannot push two bookmarks for the same tuition.
+    const result = await db.collection("users").updateOne(
+      {
+        _id: student._id,
+        role: "student",
+        "bookmarks.tuitionId": { $ne: bookmark.tuitionId },
+      },
+      { $push: { bookmarks: bookmark } }
+    );
+
+    if (result.matchedCount === 0) {
+      const freshStudent = await db.collection("users").findOne(
+        { _id: student._id, role: "student" },
+        { projection: { bookmarks: 1 } }
+      );
+
+      if (!freshStudent) {
+        return res.status(404).json({
+          success: false,
+          message: "Student account not found",
+        });
+      }
+
+      return res.status(409).json({
+        success: false,
+        message: "Tuition is already bookmarked",
+      });
+    }
 
     return res.status(201).json({
       success: true,
       message: "Tuition bookmarked successfully",
-      bookmarkId: result.insertedId,
+      bookmarkId: bookmark._id,
       bookmark,
     });
   } catch (error) {
@@ -238,12 +273,13 @@ export const removeBookmark = async (req, res) => {
       });
     }
 
-    const result = await db.collection("bookmarks").deleteOne({
-      tuitionId,
-      studentEmail: student.email,
-    });
+    const normalizedId = String(tuitionId).toLowerCase();
+    const result = await db.collection("users").updateOne(
+      { _id: student._id, role: "student" },
+      { $pull: { bookmarks: { tuitionId: { $in: [tuitionId, normalizedId] } } } }
+    );
 
-    if (result.deletedCount === 0) {
+    if (result.modifiedCount === 0) {
       return res.status(404).json({
         success: false,
         message: "Bookmark not found",

@@ -18,9 +18,18 @@ export const getTuitionReviews = async (req, res) => {
 
     const db = getDB();
 
+    // Public reads follow the same visibility rule as the tuition listing:
+    // only approved + active batches expose their embedded reviews.
     const tuition = await db
       .collection("tuitions")
-      .findOne({ _id: new ObjectId(tuitionId) }, { projection: { _id: 1 } });
+      .findOne(
+        {
+          _id: new ObjectId(tuitionId),
+          approvalStatus: "approved",
+          isActive: true,
+        },
+        { projection: { reviews: 1 } }
+      );
 
     if (!tuition) {
       return res.status(404).json({
@@ -29,11 +38,14 @@ export const getTuitionReviews = async (req, res) => {
       });
     }
 
-    const reviews = await db
-      .collection("reviews")
-      .find({ tuitionId })
-      .sort({ createdAt: -1 })
-      .toArray();
+    const reviewTime = (review) => {
+      const time = Date.parse(review.createdAt);
+      return Number.isFinite(time) ? time : 0;
+    };
+
+    const reviews = (Array.isArray(tuition.reviews) ? tuition.reviews : [])
+      .slice()
+      .sort((a, b) => reviewTime(b) - reviewTime(a));
 
     const total = reviews.length;
     const sum = reviews.reduce((value, review) => value + Number(review.rating || 0), 0);
@@ -106,7 +118,7 @@ export const createReview = async (req, res) => {
 
     const tuition = await db.collection("tuitions").findOne(
       { _id: new ObjectId(tuitionId), approvalStatus: "approved" },
-      { projection: { title: 1 } }
+      { projection: { title: 1, reviews: 1 } }
     );
 
     if (!tuition) {
@@ -130,10 +142,10 @@ export const createReview = async (req, res) => {
       });
     }
 
-    const existingReview = await db.collection("reviews").findOne({
-      tuitionId,
-      studentEmail: student.email,
-    });
+    const existingReviews = Array.isArray(tuition.reviews) ? tuition.reviews : [];
+    const existingReview = existingReviews.find(
+      (item) => item.studentEmail === student.email
+    );
 
     if (existingReview) {
       return res.status(409).json({
@@ -143,6 +155,7 @@ export const createReview = async (req, res) => {
     }
 
     const review = {
+      _id: new ObjectId(),
       tuitionId,
       tuitionTitle: tuition.title,
       studentId: req.user.userId,
@@ -153,12 +166,39 @@ export const createReview = async (req, res) => {
       createdAt: new Date(),
     };
 
-    const result = await db.collection("reviews").insertOne(review);
+    // The $ne guard keeps the one-review-per-student rule atomic even if two
+    // requests arrive at the same time.
+    const result = await db.collection("tuitions").updateOne(
+      {
+        _id: tuition._id,
+        "reviews.studentEmail": { $ne: student.email },
+      },
+      { $push: { reviews: review } }
+    );
+
+    if (result.matchedCount === 0) {
+      const freshTuition = await db.collection("tuitions").findOne(
+        { _id: tuition._id },
+        { projection: { reviews: 1 } }
+      );
+
+      if (!freshTuition) {
+        return res.status(404).json({
+          success: false,
+          message: "Approved tuition not found",
+        });
+      }
+
+      return res.status(409).json({
+        success: false,
+        message: "You have already reviewed this tuition",
+      });
+    }
 
     return res.status(201).json({
       success: true,
       message: "Review submitted successfully",
-      review: { _id: result.insertedId, ...review },
+      review: { _id: review._id, ...review },
     });
   } catch (error) {
     console.error("Create Review Error:", error.message);

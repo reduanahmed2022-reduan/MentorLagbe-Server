@@ -466,6 +466,8 @@ const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
 const DEFAULT_PUBLIC_LIMIT = 50;
 
+const isText = (value) => typeof value === "string" && value.trim().length > 0;
+
 // Normalize a user-supplied limit into a finite integer in 1..50.
 // Arrays (repeated query keys), non-numeric strings, Infinity and empty
 // values all fall back to a bounded default so no path can return an
@@ -505,14 +507,9 @@ export const createTuition = async (req, res) => {
 
     // Required field validation
     if (
-      !title?.trim() ||
-      !subject?.trim() ||
-      !classLevel?.trim() ||
-      !mode ||
-      !location?.trim() ||
+      ![title, subject, classLevel, mode, location, description].every(isText) ||
       monthlyFee === undefined ||
-      daysPerWeek === undefined ||
-      !description?.trim()
+      daysPerWeek === undefined
     ) {
       return res.status(400).json({
         success: false,
@@ -592,7 +589,7 @@ export const createTuition = async (req, res) => {
       monthlyFee,
       daysPerWeek,
       description: description.trim(),
-      bannerImage: bannerImage || "",
+      bannerImage: typeof bannerImage === "string" ? bannerImage : "",
       tutorName: tutor.name,
       tutorEmail: tutor.email,
       approvalStatus: "pending",
@@ -1068,12 +1065,8 @@ export const updateMyTuition = async (req, res) => {
 
     // Validate Required Fields
     if (
-      !title?.trim() ||
-      !subject?.trim() ||
-      !classLevel?.trim() ||
-      !["Online", "Offline"].includes(mode) ||
-      !location?.trim() ||
-      !description?.trim()
+      ![title, subject, classLevel, mode, location, description].every(isText) ||
+      !["Online", "Offline"].includes(mode)
     ) {
       return res.status(400).json({
         success: false,

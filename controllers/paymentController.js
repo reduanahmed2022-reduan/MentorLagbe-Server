@@ -137,7 +137,11 @@ export const verifyCheckoutSession = async (req, res) => {
           ? "Payment is not completed yet"
           : result.reason === "invalid_amount"
             ? "Payment amount did not match the selected plan"
-            : "Your Pro plan is active",
+            : result.reason === "invalid_plan"
+              ? "Plan could not be verified"
+              : result.activated || result.reason === "already_recorded"
+                ? "Your Pro plan is active"
+                : "We could not activate your Pro plan",
     });
   } catch (error) {
     console.error("Verify Checkout Session Error:", error);

@@ -9,6 +9,14 @@ const isNonEmptyString = (value) =>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Keep the profile response shape aligned with the client's AuthUser type:
+// `id` instead of `_id` and `image` alongside `profileImage`.
+const toPublicUser = (user) => ({
+  ...user,
+  id: String(user.id || user._id || ""),
+  image: user.image || user.profileImage || "",
+});
+
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -149,6 +157,9 @@ export const registerUser = async (req, res) => {
         email: normalizedEmail,
         password: hashedPassword,
         role: registeredRole,
+        plan: "free",
+        image: "",
+        profileImage: "",
         createdAt: new Date(),
       };
 
@@ -326,7 +337,7 @@ export const getMyProfile = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Profile retrieved successfully",
-      user,
+      user: toPublicUser(user),
     });
   } catch (error) {
     console.error("Get Profile Error:", error);
@@ -387,7 +398,7 @@ export const updateMyProfile = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      user: updatedUser,
+      user: toPublicUser(updatedUser),
     });
   } catch (error) {
     console.error("Update Profile Error:", error);

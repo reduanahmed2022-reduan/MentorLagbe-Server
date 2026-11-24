@@ -113,7 +113,13 @@ export const updateUserRole = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: `User already has the ${role} role`,
-        user: { id: user._id.toString(), name: user.name, email: user.email, role },
+        user: {
+          _id: user._id.toString(),
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+          role,
+        },
       });
     }
 

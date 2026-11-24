@@ -158,7 +158,9 @@ const tutors = [
   }
 ];
 
-// Link the public tutor directory to the demo login accounts where names match.
+// Every catalog row now maps to a real email. Demo login accounts keep their
+// existing addresses; catalog-only tutors get deterministic addresses so no
+// profile is ever written with an empty email.
 const accountEmails = {
   "Sarah Ahmed": "sarah@mentorlagbe.com",
   "Rahim Hasan": "rahim@mentorlagbe.com",
@@ -166,7 +168,19 @@ const accountEmails = {
   "Sabbir Hossain": "sabbir@mentorlagbe.com",
   "Ayesha Rahman": "ayesha@mentorlagbe.com",
   "Tanvir Ahmed": "tanvir@mentorlagbe.com",
+  "Mehedi Hasan": "mehedi@mentorlagbe.com",
+  "Fatema Akter": "fatema@mentorlagbe.com",
+  "Arif Chowdhury": "arif@mentorlagbe.com",
+  "Mim Akter": "mim@mentorlagbe.com",
+  "Rakibul Islam": "rakibul@mentorlagbe.com",
 };
+
+const emailForTutor = (name) =>
+  accountEmails[name] ||
+  `${name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")}@mentorlagbe.com`;
 
 async function seedTutors() {
   try {
@@ -174,39 +188,59 @@ async function seedTutors() {
 
     const db = getDB();
 
+    // Tutor profiles live on `users` documents with role:"tutor"; there is no
+    // separate tutors collection to insert into.
     const users = db.collection("users");
-    const operations = [];
+    let added = 0;
+    let linked = 0;
 
     for (const tutor of tutors) {
-      const email = accountEmails[tutor.name] || "";
-      const user = email
-        ? await users.findOne({ email }, { projection: { _id: 1 } })
-        : null;
+      const email = emailForTutor(tutor.name);
 
-      operations.push({
-        updateOne: {
-          filter: { name: tutor.name, subject: tutor.subject },
-          update: {
-            $setOnInsert: tutor,
-            $set: {
-              email,
-              ...(user ? { userId: user._id.toString() } : {}),
-            },
+      let user = await users.findOne({ email }, { projection: { _id: 1 } });
+
+      if (!user) {
+        const inserted = await users.insertOne({
+          email,
+          name: tutor.name,
+          role: "tutor",
+          image: tutor.image || "",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        user = { _id: inserted.insertedId };
+        added += 1;
+      } else {
+        linked += 1;
+      }
+
+      await users.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            ...tutor,
+            email,
+            role: "tutor",
+            // The public catalog's userId mirrors this user's own _id.
+            userId: user._id.toString(),
+            updatedAt: new Date(),
           },
-          upsert: true,
-        },
-      });
+          $setOnInsert: { createdAt: new Date() },
+        }
+      );
     }
 
-    const result = await db.collection("tutors").bulkWrite(operations);
-
     console.log(
-      `${result.upsertedCount} tutors added, ${result.modifiedCount} linked.`
+      `${added} tutor accounts added, ${linked} linked to existing users.`
     );
 
-    const total = await db.collection("tutors").countDocuments();
+    const total = await users.countDocuments({
+      role: "tutor",
+      subject: { $exists: true },
+    });
 
-    console.log(`Total tutors in database: ${total}`);
+    console.log(`Total tutor profiles in database: ${total}`);
 
     process.exit(0);
   } catch (error) {

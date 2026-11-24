@@ -13,7 +13,9 @@ const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@mentorlagbe.com")
 
 const tutors = [
   { name: "Sarah Ahmed", email: "sarah@mentorlagbe.com", plan: "pro", phone: "+8801711000001", bio: "Mathematics specialist with 8 years of teaching experience." },
-  { name: "Rahim Hasan", email: "rahim@mentorlagbe.com", plan: "free", phone: "+8801711000002", bio: "English and IELTS mentor helping students build confidence." },
+  // Pro because seedFeaturedTuitions.js adds a third approved batch for Rahim;
+  // keeping this tutor free would exceed the 2-tuition free-plan rule.
+  { name: "Rahim Hasan", email: "rahim@mentorlagbe.com", plan: "pro", phone: "+8801711000002", bio: "English and IELTS mentor helping students build confidence." },
   { name: "Nusrat Jahan", email: "nusrat@mentorlagbe.com", plan: "pro", phone: "+8801711000003", bio: "Physics educator who makes difficult concepts simple." },
   { name: "Sabbir Hossain", email: "sabbir@mentorlagbe.com", plan: "pro", phone: "+8801711000004", bio: "Full-stack developer teaching practical programming." },
   { name: "Ayesha Rahman", email: "ayesha@mentorlagbe.com", plan: "pro", phone: "+8801711000005", bio: "Biology mentor focused on exam-oriented learning." },
@@ -28,7 +30,7 @@ const students = [
 const image = (id) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1200&q=80`;
 
-// 12 approved batches plus two records so the admin moderation queue is demoable.
+// 14 approved batches (including IELTS and Programming) plus two records so the admin moderation queue is demoable.
 const tuitions = [
   ["Algebra Mastery for HSC", "Mathematics", "HSC", "Online", "Dhaka", 3500, 3, "photo-1509062522246-3755977927d7", "Complete algebra course covering equations, functions and exam practice.", "sarah@mentorlagbe.com", "approved"],
   ["Calculus Foundations", "Mathematics", "University", "Online", "Online", 5000, 2, "photo-1635070041078-e363dbe005cb", "Build a strong calculus foundation with guided problem solving.", "sarah@mentorlagbe.com", "approved"],
@@ -44,6 +46,9 @@ const tuitions = [
   ["Chemistry for JEE / Engineering", "Chemistry", "University", "Online", "Online", 4800, 3, "photo-1554475901-4538ddfbccc2", "Structured problem solving for competitive exams.", "tanvir@mentorlagbe.com", "approved"],
   ["Business Statistics for Beginners", "Mathematics", "Adult", "Online", "Online", 3600, 2, "photo-1551288049-bebda4e38f71", "Practical statistics for everyday business decisions.", "sarah@mentorlagbe.com", "pending"],
   ["Data Science Bootcamp", "Coding", "Adult", "Online", "Online", 6500, 3, "photo-1551288049-bebda4e38f71", "An intensive introduction to data analysis with Python.", "sabbir@mentorlagbe.com", "rejected"],
+  // Subject variety for the IELTS / Programming category links on the client.
+  ["IELTS Speaking & Writing Lab", "IELTS", "Adult", "Online", "Online", 4200, 3, "photo-1503676260728-1c00da094a0b", "IELTS band 7+ speaking and writing practice with weekly feedback.", "sarah@mentorlagbe.com", "approved"],
+  ["Programming with JavaScript", "Programming", "SSC", "Online", "Online", 3800, 2, "photo-1498050108023-c5249f4df085", "Hands-on JavaScript fundamentals through small browser projects.", "sabbir@mentorlagbe.com", "approved"],
 ];
 
 async function upsertUser(users, user, role, password, extra = {}) {
@@ -216,7 +221,7 @@ async function seed() {
     );
   }
 
-  console.log("Seed completed: admin, 6 tutors, 2 students, 12 approved tuitions, 2 moderation records, 5 applications and demo payments.");
+  console.log("Seed completed: admin, 6 tutors, 2 students, 14 approved tuitions, 2 moderation records, 5 applications and demo payments.");
   if (USING_DEFAULT_ADMIN_PASSWORD) {
     console.log(`Admin login: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
   } else {

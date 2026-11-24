@@ -91,7 +91,7 @@ export const applyToTuition = async (req, res) => {
       });
     }
 
-    if (!preferredSchedule || !preferredSchedule.trim()) {
+    if (typeof preferredSchedule !== "string" || !preferredSchedule.trim()) {
       return res.status(400).json({
         success: false,
         message: "Preferred schedule is required",
@@ -165,9 +165,10 @@ export const applyToTuition = async (req, res) => {
       tutorEmail: tuition.tutorEmail,
       studentName: student.name,
       studentEmail: student.email,
-      studentPhone: studentPhone?.trim() || student.phone || "",
+      studentPhone:
+        typeof studentPhone === "string" ? studentPhone.trim() : student.phone || "",
       preferredSchedule: preferredSchedule.trim(),
-      studentNote: studentNote?.trim() || "",
+      studentNote: typeof studentNote === "string" ? studentNote.trim() : "",
       status: "pending",
       appliedAt: new Date(),
     };
@@ -371,18 +372,26 @@ export const cancelApplication = async (req, res) => {
       });
     }
 
-    const result = await db.collection("applications").deleteOne({
+    const application = await db.collection("applications").findOne({
       _id: new ObjectId(id),
       studentEmail: student.email,
-      status: "pending",
     });
 
-    if (result.deletedCount === 0) {
+    if (!application) {
       return res.status(404).json({
         success: false,
-        message: "Pending application not found or already reviewed",
+        message: "Application not found",
       });
     }
+
+    if (application.status !== "pending") {
+      return res.status(409).json({
+        success: false,
+        message: "Only pending applications can be cancelled",
+      });
+    }
+
+    await db.collection("applications").deleteOne({ _id: application._id });
 
     return res.status(200).json({
       success: true,

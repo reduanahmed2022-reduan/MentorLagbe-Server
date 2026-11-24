@@ -50,7 +50,7 @@ Tutor: `sarah@mentorlagbe.com` / `Tutor@12345` · Student: `student1@mentorlagbe
 | Role-based access (student/tutor/admin) | ✅ | Bearer + role middleware |
 | Live deployment | ✅ | Render (this API) + Vercel (client) |
 | README with live URL, credentials, features, packages | ✅ | this file |
-| Version control history | ✅ | 44+ meaningful server commits |
+| Version control history | ✅ | 55+ meaningful server commits |
 
 ---
 
@@ -162,8 +162,7 @@ Database name: **`MantorLagbe`**
 
 | Collection | Contents |
 | --- | --- |
-| `users` | Students, tutors, admins (bcrypt hashes, role, plan, profile) and BetterAuth user records. |
-| `tutors` | Public tutor catalog used by `/api/tutors`. |
+| `users` | Students, tutors (with public catalog fields), admins (bcrypt hashes, role, plan, profile) and BetterAuth user records. |
 | `tuitions` | Tuition posts with `approvalStatus`, tutor ref, schedule and fee. |
 | `applications` | Student applications with status and unique `(tuitionId, studentEmail)`. |
 | `payments` | Paid Stripe sessions, amounts, transaction IDs and activation timestamps. |
