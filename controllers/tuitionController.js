@@ -677,11 +677,19 @@ export const getAllTuitions = async (req, res) => {
       ];
     }
 
-    // Subject Filter
+    // Subject Filter. Coding is the canonical platform label, but older
+    // listings may still be stored as ICT, so both match the same filter.
     if (subject?.trim()) {
+      const requestedSubject = subject.trim();
+      const subjectValues =
+        requestedSubject.toLowerCase() === "coding"
+          ? ["Coding", "ICT", "Programming"]
+          : [requestedSubject];
+
       filter.subject = {
-        $regex: `^${escapeRegex(subject.trim())}$`,
-        $options: "i",
+        $in: subjectValues.map(
+          (value) => new RegExp(`^${escapeRegex(value)}$`, "i")
+        ),
       };
     }
 

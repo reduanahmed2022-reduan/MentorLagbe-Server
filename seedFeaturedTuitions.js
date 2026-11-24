@@ -21,7 +21,9 @@ const batches = [
   ["Primary Mathematics Basics", "Mathematics", "Class 5", "Online", "Dhaka", 500, 2, "photo-1509062522246-3755977927d7", "Friendly foundational math classes with plenty of guided practice.", "sarah@mentorlagbe.com"],
   ["English Conversation Club", "English", "SSC", "Online", "Online", 550, 2, "photo-1513258496099-48168024aec0", "Build everyday speaking confidence through interactive conversation drills.", "sarah@mentorlagbe.com"],
   ["Junior Physics Made Easy", "Physics", "Class 9", "Offline", "Sylhet", 600, 3, "photo-1636466497217-26a8cbeaf0aa", "Core physics concepts explained with simple examples and homework support.", "nusrat@mentorlagbe.com"],
-  ["Creative Coding for Kids", "ICT", "Class 8", "Online", "Online", 650, 2, "photo-1526379095098-d400fd0bf935", "A playful introduction to programming through small projects and puzzles.", "sabbir@mentorlagbe.com"],
+  ["Creative Coding for Kids", "Coding", "Class 8", "Online", "Online", 650, 2, "photo-1526379095098-d400fd0bf935", "A playful introduction to programming through small projects and puzzles.", "sabbir@mentorlagbe.com"],
+  ["Music Theory for Beginners", "Music", "Class 7", "Online", "Online", 600, 2, "photo-1511379938547-c1f69419868d", "Learn rhythm, notation and practical music skills through short guided sessions.", "nusrat@mentorlagbe.com"],
+  ["Language Speaking Lab", "Language", "Class 9", "Online", "Online", 700, 2, "photo-1546410531-bb4caa6b424d", "Build confident speaking and listening skills with interactive language practice.", "rahim@mentorlagbe.com"],
   ["Biology Basics for Beginners", "Biology", "Class 10", "Offline", "Rajshahi", 700, 3, "photo-1530026405186-ed1f139313f8", "Chapter-wise biology foundations with diagrams and quick revision notes.", "ayesha@mentorlagbe.com"],
   ["Chemistry Quick Revision", "Chemistry", "HSC", "Online", "Online", 780, 3, "photo-1554475901-4538ddfbccc2", "Fast, focused HSC chemistry revision with reaction mechanisms and past questions.", "tanvir@mentorlagbe.com"],
   ["Advanced Mathematics Practice", "Mathematics", "Class 11", "Online", "Dhaka", 750, 3, "photo-1635070041078-e363dbe005cb", "Exam-focused mathematics practice with step-by-step problem solving.", "sarah@mentorlagbe.com"],
@@ -53,6 +55,10 @@ const priorityTitles = [
 // Rewrite the two initially Biology-labelled budget batches to the subjects the
 // section actually needs. Matching on the old title keeps this idempotent.
 const subjectFixes = [
+  {
+    match: { title: "Creative Coding for Kids", tutorEmail: "sabbir@mentorlagbe.com" },
+    set: { subject: "Coding" },
+  },
   {
     match: { title: "Cell Biology Essentials", tutorEmail: "ayesha@mentorlagbe.com" },
     set: {

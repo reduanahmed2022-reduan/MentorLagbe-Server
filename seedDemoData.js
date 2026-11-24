@@ -36,14 +36,14 @@ const tuitions = [
   ["Spoken English for Beginners", "English", "SSC", "Offline", "Chattogram", 2500, 2, "photo-1513258496099-48168024aec0", "Conversation-focused classes to speak English confidently.", "rahim@mentorlagbe.com", "approved"],
   ["Physics for Engineering aspirants", "Physics", "HSC", "Online", "Dhaka", 4000, 3, "photo-1636466497217-26a8cbeaf0aa", "Mechanics, electricity and optics with numerical drills.", "nusrat@mentorlagbe.com", "approved"],
   ["Modern Physics Crash Course", "Physics", "University", "Online", "Online", 5500, 2, "photo-1532094349884-543bc11b234d", "Quantum mechanics and relativity explained visually.", "nusrat@mentorlagbe.com", "approved"],
-  ["Full-Stack Web Development", "ICT", "Adult", "Online", "Online", 6000, 3, "photo-1498050108023-c5249f4df085", "Learn React, Node.js and MongoDB by building real projects.", "sabbir@mentorlagbe.com", "approved"],
-  ["Python for Absolute Beginners", "ICT", "SSC", "Online", "Online", 3000, 2, "photo-1526379095098-d400fd0bf935", "A friendly introduction to programming with Python.", "sabbir@mentorlagbe.com", "approved"],
+  ["Full-Stack Web Development", "Coding", "Adult", "Online", "Online", 6000, 3, "photo-1498050108023-c5249f4df085", "Learn React, Node.js and MongoDB by building real projects.", "sabbir@mentorlagbe.com", "approved"],
+  ["Python for Absolute Beginners", "Coding", "SSC", "Online", "Online", 3000, 2, "photo-1526379095098-d400fd0bf935", "A friendly introduction to programming with Python.", "sabbir@mentorlagbe.com", "approved"],
   ["Biology for Medical Entrance", "Biology", "HSC", "Offline", "Sylhet", 3800, 4, "photo-1530026405186-ed1f139313f8", "Chapter-wise medical entrance preparation with diagrams.", "ayesha@mentorlagbe.com", "approved"],
   ["Genetics & Evolution", "Biology", "University", "Online", "Online", 4200, 2, "photo-1532187863486-abf9dbad1b69", "Understand inheritance, DNA and evolution with examples.", "ayesha@mentorlagbe.com", "approved"],
   ["Organic Chemistry Essentials", "Chemistry", "HSC", "Offline", "Khulna", 3200, 3, "photo-1554475901-4538ddfbccc2", "Reaction mechanisms made easy with practice sheets.", "tanvir@mentorlagbe.com", "approved"],
   ["Chemistry for JEE / Engineering", "Chemistry", "University", "Online", "Online", 4800, 3, "photo-1554475901-4538ddfbccc2", "Structured problem solving for competitive exams.", "tanvir@mentorlagbe.com", "approved"],
   ["Business Statistics for Beginners", "Mathematics", "Adult", "Online", "Online", 3600, 2, "photo-1551288049-bebda4e38f71", "Practical statistics for everyday business decisions.", "sarah@mentorlagbe.com", "pending"],
-  ["Data Science Bootcamp", "ICT", "Adult", "Online", "Online", 6500, 3, "photo-1551288049-bebda4e38f71", "An intensive introduction to data analysis with Python.", "sabbir@mentorlagbe.com", "rejected"],
+  ["Data Science Bootcamp", "Coding", "Adult", "Online", "Online", 6500, 3, "photo-1551288049-bebda4e38f71", "An intensive introduction to data analysis with Python.", "sabbir@mentorlagbe.com", "rejected"],
 ];
 
 async function upsertUser(users, user, role, password, extra = {}) {
