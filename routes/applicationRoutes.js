@@ -7,12 +7,14 @@ import {
   getTutorApplicants,
   updateApplicationStatus,
   cancelApplication,
+  restoreRejectedApplication,
 } from "../controllers/applicationController.js";
 
 import {
   verifyToken,
   verifyStudent,
   verifyTutor,
+  authorizeRole,
 } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -47,6 +49,14 @@ router.get(
   verifyToken,
   verifyTutor,
   getTutorApplicants
+);
+
+// Restore a rejected application: owner student, managing tutor, or admin
+router.patch(
+  "/:id/restore",
+  verifyToken,
+  authorizeRole("student", "tutor", "admin"),
+  restoreRejectedApplication
 );
 
 // Tutor Only: Update Application Status

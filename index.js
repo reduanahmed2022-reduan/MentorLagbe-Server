@@ -9,6 +9,7 @@ import authRoutes from "./routes/authRoutes.js";
 import tuitionRoutes from "./routes/tuitionRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
+import bookmarkRoutes from "./routes/bookmarkRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
@@ -65,6 +66,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tuitions", tuitionRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/applications", applicationRoutes);
+app.use("/api/bookmarks", bookmarkRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/upload", uploadRoutes);
 

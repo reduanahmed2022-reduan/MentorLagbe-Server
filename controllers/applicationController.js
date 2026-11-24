@@ -2,6 +2,31 @@
 import { ObjectId } from "mongodb";
 import { getDB } from "../config/db.js";
 
+// Free students may keep two applications waiting for review at a time.
+const FREE_STUDENT_APPLY_LIMIT = 2;
+
+/**
+ * Tutor ownership can be stale on legacy application snapshots (for example a
+ * changed email). Build an OR filter that accepts both the email snapshot and
+ * any tuition currently owned by this tutor.
+ */
+async function getTutorApplicationOwnership(db, tutorEmail) {
+  const ownedTuitions = await db
+    .collection("tuitions")
+    .find({ tutorEmail }, { projection: { _id: 1 } })
+    .toArray();
+
+  const tuitionIds = ownedTuitions.flatMap((tuition) => [
+    tuition._id.toString(),
+    tuition._id,
+  ]);
+
+  return [
+    { tutorEmail },
+    ...(tuitionIds.length ? [{ tuitionId: { $in: tuitionIds } }] : []),
+  ];
+}
+
 // Student: Get My Applications
 export const getMyApplications = async (req, res) => {
   try {
@@ -115,6 +140,22 @@ export const applyToTuition = async (req, res) => {
       });
     }
 
+    // Free students can keep two applications waiting for review at a time.
+    // Accepted/rejected rows are not pending, so they do not consume a slot.
+    if (student.plan !== "pro") {
+      const pendingCount = await db.collection("applications").countDocuments({
+        studentEmail: student.email,
+        status: "pending",
+      });
+
+      if (pendingCount >= FREE_STUDENT_APPLY_LIMIT) {
+        return res.status(403).json({
+          success: false,
+          message: "Free plan allows up to 2 pending applications at a time",
+        });
+      }
+    }
+
     // Create Application
     const application = {
       tuitionId: tuition._id.toString(),
@@ -182,12 +223,13 @@ export const getTutorApplicants = async (req, res) => {
       });
     }
 
-    // Get Only This Tutor's Applicants
+    // Get applications for this tutor, including rows whose tutorEmail snapshot
+    // is stale but whose tuition is still owned by this account.
+    const ownership = await getTutorApplicationOwnership(db, tutor.email);
+
     const applicants = await db
       .collection("applications")
-      .find({
-        tutorEmail: tutor.email,
-      })
+      .find({ $or: ownership })
       .sort({ appliedAt: -1 })
       .toArray();
 
@@ -243,10 +285,12 @@ export const updateApplicationStatus = async (req, res) => {
       });
     }
 
-    // Find Application Belonging to This Tutor
+    // Find Application Belonging to This Tutor (with stale-snapshot fallback)
+    const ownership = await getTutorApplicationOwnership(db, tutor.email);
+
     const application = await db.collection("applications").findOne({
       _id: new ObjectId(id),
-      tutorEmail: tutor.email,
+      $or: ownership,
     });
 
     if (!application) {
@@ -268,8 +312,8 @@ export const updateApplicationStatus = async (req, res) => {
     const result = await db.collection("applications").updateOne(
       {
         _id: new ObjectId(id),
-        tutorEmail: tutor.email,
         status: "pending",
+        $or: ownership,
       },
       {
         $set: {
@@ -350,6 +394,159 @@ export const cancelApplication = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to cancel application",
+    });
+  }
+};
+
+// Restore a rejected application to pending so it can be reviewed again.
+// Students can restore their own rows; tutors/admins can restore rows they manage.
+export const restoreRejectedApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { preferredSchedule, studentNote, studentPhone } = req.body || {};
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid application ID",
+      });
+    }
+
+    if (!ObjectId.isValid(req.user.userId)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid user information",
+      });
+    }
+
+    const db = getDB();
+    const role = req.user.role;
+    let ownershipFilter = {};
+    let student = null;
+
+    if (role === "student") {
+      student = await db.collection("users").findOne({
+        _id: new ObjectId(req.user.userId),
+        role: "student",
+      });
+
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "Student account not found",
+        });
+      }
+
+      ownershipFilter = { studentEmail: student.email };
+    } else if (role === "tutor") {
+      const tutor = await db.collection("users").findOne({
+        _id: new ObjectId(req.user.userId),
+        role: "tutor",
+      });
+
+      if (!tutor) {
+        return res.status(404).json({
+          success: false,
+          message: "Tutor account not found",
+        });
+      }
+
+      ownershipFilter = {
+        $or: await getTutorApplicationOwnership(db, tutor.email),
+      };
+    }
+
+    // Admins intentionally get no ownership filter.
+    const application = await db.collection("applications").findOne({
+      _id: new ObjectId(id),
+      ...ownershipFilter,
+    });
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found or access denied",
+      });
+    }
+
+    if (application.status !== "rejected") {
+      return res.status(409).json({
+        success: false,
+        message: "Only rejected applications can be restored",
+      });
+    }
+
+    // Plan limits apply only when a student restores their own application.
+    if (student && student.plan !== "pro") {
+      const pendingCount = await db.collection("applications").countDocuments({
+        studentEmail: student.email,
+        status: "pending",
+      });
+
+      if (pendingCount >= FREE_STUDENT_APPLY_LIMIT) {
+        return res.status(403).json({
+          success: false,
+          message: "Free plan allows up to 2 pending applications at a time",
+        });
+      }
+    }
+
+    const restoredAt = new Date();
+    const restoredFields = {
+      status: "pending",
+      restoredAt,
+    };
+
+    // Let a student refresh their apply details while restoring.
+    if (typeof preferredSchedule === "string" && preferredSchedule.trim()) {
+      restoredFields.preferredSchedule = preferredSchedule.trim();
+    }
+    if (typeof studentNote === "string") {
+      restoredFields.studentNote = studentNote.trim();
+    }
+    if (typeof studentPhone === "string" && studentPhone.trim()) {
+      restoredFields.studentPhone = studentPhone.trim();
+    }
+
+    const result = await db.collection("applications").updateOne(
+      {
+        _id: new ObjectId(id),
+        status: "rejected",
+        ...ownershipFilter,
+      },
+      {
+        $set: restoredFields,
+        $unset: {
+          reviewedAt: "",
+        },
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Application status could not be restored",
+      });
+    }
+
+    const restoredApplication = {
+      ...application,
+      ...restoredFields,
+    };
+    delete restoredApplication.reviewedAt;
+
+    return res.status(200).json({
+      success: true,
+      message: "Application restored to pending",
+      status: "pending",
+      application: restoredApplication,
+    });
+  } catch (error) {
+    console.error("Restore Application Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to restore application",
     });
   }
 };

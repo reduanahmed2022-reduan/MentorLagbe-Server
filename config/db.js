@@ -59,6 +59,8 @@ export async function connectDB() {
       { name: "applications.tuitionId/studentEmail", critical: true, build: () => db.collection("applications").createIndex({ tuitionId: 1, studentEmail: 1 }, { unique: true }) },
       { name: "applications.studentEmail/appliedAt", build: () => db.collection("applications").createIndex({ studentEmail: 1, appliedAt: -1 }) },
       { name: "applications.tutorEmail/appliedAt", build: () => db.collection("applications").createIndex({ tutorEmail: 1, appliedAt: -1 }) },
+      { name: "bookmarks.tuitionId/studentEmail", critical: true, build: () => db.collection("bookmarks").createIndex({ tuitionId: 1, studentEmail: 1 }, { unique: true }) },
+      { name: "bookmarks.studentEmail/bookmarkedAt", build: () => db.collection("bookmarks").createIndex({ studentEmail: 1, bookmarkedAt: -1 }) },
       { name: "payments.stripeSessionId", critical: true, build: () => db.collection("payments").createIndex({ stripeSessionId: 1 }, { unique: true }) },
       { name: "payments.paidAt", build: () => db.collection("payments").createIndex({ paidAt: -1 }) },
     ];

@@ -11,12 +11,14 @@ import {
   deleteMyTuition,
   getTuitionById,
   toggleTuitionStatus,
+  restoreRejectedTuition,
 } from "../controllers/tuitionController.js";
 
 import {
   verifyToken,
   verifyTutor,
   verifyAdmin,
+  authorizeRole,
 } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -46,6 +48,14 @@ router.patch(
   verifyToken,
   verifyAdmin,
   reviewTuition
+);
+
+// Admin or Tutor: Restore a rejected tuition back to pending
+router.patch(
+  "/:id/restore",
+  verifyToken,
+  authorizeRole("admin", "tutor"),
+  restoreRejectedTuition
 );
 
 // Tutor Only: Get My Tuitions

@@ -904,6 +904,87 @@ export const reviewTuition = async (req, res) => {
   }
 };
 
+// Admin/Tutor: Restore a rejected tuition to pending for a fresh review
+export const restoreRejectedTuition = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tuition ID",
+      });
+    }
+
+    const db = getDB();
+
+    // Tutors may only restore their own rejected batches. Admins may restore any.
+    let ownershipFilter = {};
+
+    if (req.user.role === "tutor") {
+      if (!ObjectId.isValid(req.user.userId)) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid user information",
+        });
+      }
+
+      const tutor = await db.collection("users").findOne({
+        _id: new ObjectId(req.user.userId),
+        role: "tutor",
+      });
+
+      if (!tutor) {
+        return res.status(404).json({
+          success: false,
+          message: "Tutor account not found",
+        });
+      }
+
+      ownershipFilter = { tutorEmail: tutor.email };
+    }
+
+    const result = await db.collection("tuitions").updateOne(
+      {
+        _id: new ObjectId(id),
+        approvalStatus: "rejected",
+        ...ownershipFilter,
+      },
+      {
+        $set: {
+          approvalStatus: "pending",
+          isActive: false,
+          updatedAt: new Date(),
+        },
+        $unset: {
+          reviewedAt: "",
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Rejected tuition not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Tuition restored to pending",
+      approvalStatus: "pending",
+      isActive: false,
+    });
+  } catch (error) {
+    console.error("Restore Tuition Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to restore tuition",
+    });
+  }
+};
+
 // Tutor: Get My Tuitions
 export const getMyTuitions = async (req, res) => {
   try {
