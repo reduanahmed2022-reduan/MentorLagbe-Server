@@ -469,21 +469,8 @@ export const restoreRejectedApplication = async (req, res) => {
       });
     }
 
-    // Plan limits apply only when a student restores their own application.
-    if (student && student.plan !== "pro") {
-      const pendingCount = await db.collection("applications").countDocuments({
-        studentEmail: student.email,
-        status: "pending",
-      });
-
-      if (pendingCount >= FREE_STUDENT_APPLY_LIMIT) {
-        return res.status(403).json({
-          success: false,
-          message: "Free plan allows up to 2 pending applications at a time",
-        });
-      }
-    }
-
+    // The assignment imposes no cap on student applications, so a rejected
+    // application can always be restored to pending by its owner.
     const restoredAt = new Date();
     const restoredFields = {
       status: "pending",

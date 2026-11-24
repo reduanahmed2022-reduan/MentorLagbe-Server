@@ -19,7 +19,7 @@
 | 🩺 Health check | https://mentorlagbe-server-q3fr.onrender.com/health |
 | 💻 Client GitHub Repository | https://github.com/reduanahmed2022-reduan/MentorLagbe |
 | 🖥️ **Server GitHub Repository** | **https://github.com/reduanahmed2022-reduan/MentorLagbe-Server** |
-| 📮 Contact | reduanahmed@gmail.com |
+| 📮 Contact | reduanahmed2022@gmail.com |
 
 ---
 
@@ -99,7 +99,7 @@ cp .env.example .env          # macOS / Linux
 # 3. Fill MONGODB_URI + JWT_SECRET (required to boot), then run
 npm run dev                   # auto-restart on change → http://localhost:5000
 
-# 4. Seed demo users, 12 tuitions and sample applications (idempotent)
+# 4. Seed demo users, 16 tuitions (14 approved + 1 pending + 1 rejected) and sample applications (idempotent)
 npm run seed
 ```
 
@@ -135,6 +135,7 @@ Copy `.env.example`; **never commit `.env`** and never expose these in the Verce
 
 ```env
 PORT=5000
+# Local default; Render injects PORT=10000 automatically (see render.yaml).
 MONGODB_URI=your_mongodb_atlas_connection_string
 JWT_SECRET=long_random_secret
 JWT_EXPIRES_IN=7d
