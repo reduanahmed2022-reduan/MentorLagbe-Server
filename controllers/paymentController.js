@@ -1,7 +1,11 @@
 import { ObjectId } from "mongodb";
 import { CLIENT_URL, PRO_PLANS, stripe } from "../config/stripe.js";
 import { getDB } from "../config/db.js";
-import { activateSubscription } from "../services/subscriptionService.js";
+import {
+  activateSubscription,
+  deactivateSubscription,
+  recordRenewalPayment,
+} from "../services/subscriptionService.js";
 
 const stripeUnavailable = (res) =>
   res.status(503).json({
@@ -53,29 +57,35 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
+    const subscriptionMetadata = {
+      userId: user._id.toString(),
+      userEmail: user.email,
+      userName: user.name,
+      userRole: user.role,
+      planName: plan.name,
+    };
+
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
+      // Real recurring subscription (not a one-time payment).
+      mode: "subscription",
       customer_email: user.email,
+      client_reference_id: user._id.toString(),
       line_items: [
         {
           price_data: {
             currency: plan.currency,
             unit_amount: plan.amount,
+            recurring: { interval: plan.interval || "month" },
             product_data: {
               name: plan.name,
-              description: "MentorLagbe Pro Plan — unlock all Pro features",
+              description: "MentorLagbe Pro Plan — monthly subscription",
             },
           },
           quantity: 1,
         },
       ],
-      metadata: {
-        userId: user._id.toString(),
-        userEmail: user.email,
-        userName: user.name,
-        userRole: user.role,
-        planName: plan.name,
-      },
+      metadata: subscriptionMetadata,
+      subscription_data: { metadata: subscriptionMetadata },
       success_url: `${CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${CLIENT_URL}/payment/cancel`,
     });
@@ -201,6 +211,36 @@ export const handleStripeWebhook = async (req, res) => {
       return res.status(500).json({
         success: false,
         message: "Failed to sync payment",
+      });
+    }
+  }
+
+  // Monthly renewals arrive as invoice.paid events (not checkout sessions).
+  if (event.type === "invoice.paid") {
+    try {
+      const result = await recordRenewalPayment(event.data.object);
+      console.log("Stripe renewal sync:", result);
+    } catch (error) {
+      console.error("Stripe Renewal Sync Error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to record renewal payment",
+      });
+    }
+  }
+
+  // A canceled subscription returns the account to the Free plan.
+  if (event.type === "customer.subscription.deleted") {
+    try {
+      const result = await deactivateSubscription(event.data.object);
+      console.log("Stripe subscription cancellation:", result);
+    } catch (error) {
+      console.error("Stripe Cancellation Sync Error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to sync subscription cancellation",
       });
     }
   }

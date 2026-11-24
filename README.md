@@ -60,7 +60,7 @@ Tutor: `sarah@mentorlagbe.com` / `Tutor@12345` · Student: `student1@mentorlagbe
 - 🧑‍🎓 **Marketplace API** — public tutor/tuition browsing with search, filters, sorting and detail endpoints.
 - ✅ **Moderation workflow** — tutors post tuitions; admins approve or reject before they go live.
 - 📝 **Applications** — students apply once per tuition, tutors accept/reject, admins see everything.
-- 💳 **Stripe Checkout** — one-time Pro upgrades (student **$10**, tutor **$15**), signed webhook + idempotent verification.
+- 💳 **Stripe Subscriptions** — recurring monthly Pro plans (student **$10/mo**, tutor **$15/mo**) via `mode: "subscription"` Checkout, signed webhook for activation, renewals (`invoice.paid`) and cancellation, plus idempotent verification.
 - 🖼️ **ImgBB uploads** — in-memory `multer` (max 5 MB), signature checked, returns image + delete URLs.
 - 📊 **Admin endpoints** — stats, user role management, tuition queue, payment transactions.
 - 🛡️ **Hardened production behavior** — JSON 404s for unknown API routes, normalized error handler, CORS allowlist, startup env validation.
@@ -165,7 +165,7 @@ Database name: **`MantorLagbe`**
 | `users` | Students, tutors (with public catalog fields), admins (bcrypt hashes, role, plan, profile) and BetterAuth user records. |
 | `tuitions` | Tuition posts with `approvalStatus`, tutor ref, schedule and fee. |
 | `applications` | Student applications with status and unique `(tuitionId, studentEmail)`. |
-| `payments` | Paid Stripe sessions, amounts, transaction IDs and activation timestamps. |
+| `payments` | Paid Stripe checkout sessions and monthly renewal invoices: amounts, transaction/subscription IDs and payment dates. |
 
 BetterAuth's `user`/`account` tables are mapped onto `users`; sessions and verification records live in in-memory secondary storage — no extra auth collections are created.
 
@@ -242,7 +242,7 @@ Unknown `/api/*` routes return a JSON `404`, never an HTML error page.
 1. Create a Web Service from this repo; build `npm install`, start `npm start`. `render.yaml` is included.
 2. Add all environment variables above in the Render dashboard. Use the **live** `BETTER_AUTH_URL` and `CLIENT_URL` values.
 3. Set the Google redirect URI listed above in Google Cloud Console.
-4. Register the Stripe webhook `https://mentorlagbe-server-q3fr.onrender.com/api/payments/webhook` for `checkout.session.completed` and `checkout.session.async_payment_succeeded`; store its signing secret in `STRIPE_WEBHOOK_SECRET`.
+4. Register the Stripe webhook `https://mentorlagbe-server-q3fr.onrender.com/api/payments/webhook` for `checkout.session.completed`, `invoice.paid` and `customer.subscription.deleted`; store its signing secret in `STRIPE_WEBHOOK_SECRET`.
 5. **CORS:** `CLIENT_URL` must contain `https://mentorlagbe-client-weld.vercel.app`. Other origins receive `403` on preflight; requests without an `Origin` header (health checks) are allowed.
 6. Verify: `curl https://mentorlagbe-server-q3fr.onrender.com/health` → `{"success":true,"status":"OK"}`.
 

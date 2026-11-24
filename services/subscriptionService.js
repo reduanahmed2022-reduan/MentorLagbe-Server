@@ -8,7 +8,8 @@ import { PRO_PLANS } from "../config/stripe.js";
  * plus the success-page verification both call it).
  */
 export async function activateSubscription(session) {
-  if (session.payment_status !== "paid") {
+  // A subscription checkout is either paid or needs no payment (e.g. trial).
+  if (!["paid", "no_payment_required"].includes(session.payment_status)) {
     return { activated: false, reason: "payment_not_paid" };
   }
 
@@ -40,8 +41,14 @@ export async function activateSubscription(session) {
     return { activated: false, reason: "invalid_plan" };
   }
 
+  const paidAmount = session.amount_total ?? plan.amount;
+  const subscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : session.subscription?.id || "";
+
   if (
-    session.amount_total !== plan.amount ||
+    paidAmount !== plan.amount ||
     (session.currency || "").toLowerCase() !== plan.currency
   ) {
     return { activated: false, reason: "invalid_amount" };
@@ -52,13 +59,15 @@ export async function activateSubscription(session) {
     userName: user.name,
     userRole: signedRole,
     planName: metadata.planName || plan.name,
-    amount: (session.amount_total || 0) / 100,
+    amount: paidAmount / 100,
     currency: (session.currency || "usd").toUpperCase(),
     transactionId:
-      typeof session.payment_intent === "string"
+      subscriptionId ||
+      (typeof session.payment_intent === "string"
         ? session.payment_intent
-        : session.payment_intent?.id || session.id,
+        : session.payment_intent?.id || session.id),
     stripeSessionId: session.id,
+    stripeSubscriptionId: subscriptionId,
     paymentStatus: "paid",
     paidAt: new Date(),
   };
@@ -66,7 +75,13 @@ export async function activateSubscription(session) {
   const markPro = () =>
     users.updateOne(
       { _id: user._id },
-      { $set: { plan: "pro", updatedAt: new Date() } }
+      {
+        $set: {
+          plan: "pro",
+          stripeSubscriptionId: subscriptionId || user.stripeSubscriptionId || "",
+          updatedAt: new Date(),
+        },
+      }
     );
 
   try {
@@ -97,4 +112,95 @@ export async function activateSubscription(session) {
   await markPro();
 
   return { activated: true, plan: "pro", payment };
+}
+
+/**
+ * Record a renewal invoice (`invoice.paid`) in the same payments collection.
+ * Invoice IDs are unique, so renewals are idempotent like checkout sessions.
+ */
+export async function recordRenewalPayment(invoice) {
+  if (invoice.paid !== true) {
+    return { recorded: false, reason: "invoice_not_paid" };
+  }
+
+  const subscriptionId =
+    typeof invoice.subscription === "string"
+      ? invoice.subscription
+      : invoice.subscription?.id || "";
+
+  if (!subscriptionId) {
+    return { recorded: false, reason: "subscription_not_found" };
+  }
+
+  const db = getDB();
+  const users = db.collection("users");
+  const payments = db.collection("payments");
+
+  const user = await users.findOne({ stripeSubscriptionId: subscriptionId }, {
+    projection: { password: 0 },
+  });
+
+  if (!user) {
+    return { recorded: false, reason: "user_not_found" };
+  }
+
+  const plan = PRO_PLANS[user.role];
+  if (!plan) {
+    return { recorded: false, reason: "invalid_plan" };
+  }
+
+  const payment = {
+    userEmail: user.email,
+    userName: user.name,
+    userRole: user.role,
+    planName: plan.name,
+    amount: (invoice.amount_paid || 0) / 100,
+    currency: (invoice.currency || "usd").toUpperCase(),
+    transactionId:
+      typeof invoice.payment_intent === "string"
+        ? invoice.payment_intent
+        : invoice.payment_intent?.id || invoice.id,
+    stripeSessionId: invoice.id,
+    stripeSubscriptionId: subscriptionId,
+    paymentStatus: "paid",
+    paidAt: new Date((invoice.created || Date.now() / 1000) * 1000),
+  };
+
+  const claim = await payments.updateOne(
+    { stripeSessionId: invoice.id },
+    { $setOnInsert: payment },
+    { upsert: true }
+  );
+
+  if (claim.upsertedCount === 0) {
+    return { recorded: false, reason: "already_recorded" };
+  }
+
+  return { recorded: true, payment };
+}
+
+/** Return the user to the Free plan when a Stripe subscription is canceled. */
+export async function deactivateSubscription(subscription) {
+  const subscriptionId = subscription?.id;
+  if (!subscriptionId) {
+    return { deactivated: false, reason: "subscription_not_found" };
+  }
+
+  const db = getDB();
+  const users = db.collection("users");
+  const user = await users.findOne({ stripeSubscriptionId: subscriptionId });
+
+  if (!user) {
+    return { deactivated: false, reason: "user_not_found" };
+  }
+
+  await users.updateOne(
+    { _id: user._id },
+    {
+      $set: { plan: "free", updatedAt: new Date() },
+      $unset: { stripeSubscriptionId: "" },
+    }
+  );
+
+  return { deactivated: true };
 }

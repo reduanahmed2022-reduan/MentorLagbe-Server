@@ -29,8 +29,9 @@ export const CLIENT_URL =
       CLIENT_ORIGINS[0]
     : CLIENT_ORIGINS[0];
 
-// Prices are in USD cents, as required by the assignment.
+// Recurring monthly prices in USD cents, as required by the assignment.
+// Checkout runs in `subscription` mode with `recurrence: { interval: "month" }`.
 export const PRO_PLANS = {
-  tutor: { name: "Pro Tutor Plan", amount: 1500, currency: "usd" },
-  student: { name: "Pro Student Plan", amount: 1000, currency: "usd" },
+  tutor: { name: "Pro Tutor Plan", amount: 1500, currency: "usd", interval: "month" },
+  student: { name: "Pro Student Plan", amount: 1000, currency: "usd", interval: "month" },
 };
