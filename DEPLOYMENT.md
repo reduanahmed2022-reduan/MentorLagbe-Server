@@ -6,7 +6,7 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 
 - Build: `npm install`. Start: `npm start` (`node index.js`). Node **>= 20.19.0**.
 - `PORT` is injected by the host; the app falls back to `5000`.
-- Set the environment variables below. `MONGODB_URI` and `JWT_SECRET` are boot-blocking; the two BetterAuth variables are required by the pre-deploy preflight (`node scripts/verify-env.mjs`). Everything else is optional or feature-specific.
+- Set the environment variables below. `MONGODB_URI` and `JWT_SECRET` are boot-blocking; `BETTER_AUTH_SECRET` is required by the pre-deploy preflight (`node scripts/verify-env.mjs`), while `BETTER_AUTH_URL` is recommended (runtime falls back to the local API origin). Everything else is optional or feature-specific.
 
 ### Required to boot
 
@@ -17,7 +17,7 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 
 ### Required by deployment preflight
 
-`node scripts/verify-env.mjs` also requires these two **server-only** variables. Only a missing `BETTER_AUTH_SECRET` disables `/api/better-auth`; a missing `BETTER_AUTH_URL` falls back to the local API origin. The legacy JWT API still boots either way.
+`node scripts/verify-env.mjs` requires `BETTER_AUTH_SECRET` and recommends `BETTER_AUTH_URL` — both are **server-only**. Only a missing `BETTER_AUTH_SECRET` disables `/api/better-auth`; a missing `BETTER_AUTH_URL` falls back to the local API origin. The legacy JWT API still boots either way.
 
 | Variable | Example | Notes |
 | --- | --- | --- |
