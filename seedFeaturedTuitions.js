@@ -19,7 +19,7 @@ const image = (id) =>
 
 const batches = [
   ["Primary Mathematics Basics", "Mathematics", "Class 5", "Online", "Dhaka", 500, 2, "photo-1509062522246-3755977927d7", "Friendly foundational math classes with plenty of guided practice.", "sarah@mentorlagbe.com"],
-  ["English Conversation Club", "English", "SSC", "Online", "Online", 550, 2, "photo-1513258496099-48168024aec0", "Build everyday speaking confidence through interactive conversation drills.", "sarah@mentorlagbe.com"],
+  ["IELTS Speaking Workshop", "IELTS", "SSC", "Online", "Online", 550, 2, "photo-1513258496099-48168024aec0", "Build everyday speaking confidence through interactive conversation drills.", "sarah@mentorlagbe.com"],
   ["Junior Physics Made Easy", "Physics", "Class 9", "Offline", "Sylhet", 600, 3, "photo-1636466497217-26a8cbeaf0aa", "Core physics concepts explained with simple examples and homework support.", "nusrat@mentorlagbe.com"],
   ["Creative Coding for Kids", "Coding", "Class 8", "Online", "Online", 650, 2, "photo-1526379095098-d400fd0bf935", "A playful introduction to programming through small projects and puzzles.", "sabbir@mentorlagbe.com"],
   ["Music Theory for Beginners", "Music", "Class 7", "Online", "Online", 600, 2, "photo-1511379938547-c1f69419868d", "Learn rhythm, notation and practical music skills through short guided sessions.", "nusrat@mentorlagbe.com"],
@@ -166,7 +166,12 @@ async function seedFeaturedTuitions() {
     // If the script was run before and after a subject rename, two documents can
     // share the same title. Keep the row owned by the correct featured tutor and
     // archive the extras (never delete data) so the public listing has one row.
-    for (const title of ["Advanced Mathematics Practice", "English Writing Masterclass"]) {
+    for (const title of [
+      "Advanced Mathematics Practice",
+      "English Writing Masterclass",
+      "English Conversation Club",
+      "IELTS Speaking Workshop",
+    ]) {
       const matches = await tuitions
         .find({ title: { $in: [title, `${title} (archived duplicate)`] } })
         .sort({ createdAt: 1 })

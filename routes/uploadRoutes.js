@@ -8,7 +8,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, callback) => {
-    if (!file.mimetype.startsWith("image/")) {
+    if (!file.mimetype?.startsWith("image/")) {
       return callback(new Error("Only image files are allowed"));
     }
 
@@ -103,8 +103,8 @@ router.post(
       const response = await fetch("https://api.imgbb.com/1/upload", {
         method: "POST",
         body: form,
-        // Don't let a slow upstream turn into a platform 504.
-        signal: AbortSignal.timeout(15000),
+        // Generous timeout: image uploads on mobile links can take a while.
+        signal: AbortSignal.timeout(45000),
       });
       if (!response.ok) {
         return res.status(502).json({
@@ -124,9 +124,14 @@ router.post(
       }
 
       if (!result.success || !result.data?.url) {
+        const upstreamMessage =
+          typeof result.error?.message === "string" ? result.error.message : "";
+        console.error("ImgBB rejected upload:", upstreamMessage || JSON.stringify(result.error || {}));
         return res.status(502).json({
           success: false,
-          message: "Image upload failed. Please try another image.",
+          message: upstreamMessage
+            ? `Image host rejected the upload: ${upstreamMessage}`
+            : "Image upload failed. Please try another image.",
         });
       }
 
