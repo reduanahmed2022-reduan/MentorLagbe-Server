@@ -49,7 +49,7 @@ node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 | --- | --- |
 | `MONGODB_URI` | `config/db.js` import-এই throw → process exit |
 | `JWT_SECRET` | `index.js` Start-এ throw → process exit |
-| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | `scripts/verify-env.mjs` preflight_fail; শুধু `BETTER_AUTH_SECRET` না দিলে `/api/better-auth` বন্ধ থাকে, `BETTER_AUTH_URL` না দিলে local API origin ব্যবহার হয়; legacy JWT API চলে |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | `scripts/verify-env.mjs` preflight_fail; `BETTER_AUTH_SECRET` না দিলে সার্ভার বুটই করবে না (`index.js` throw), `BETTER_AUTH_URL` না দিলে local API origin ব্যবহার হয় |
 
 **Optional / feature-specific (সার্ভার উঠবে, ফিচারের উপর নির্ভর করে 503):**
 

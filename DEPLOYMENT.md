@@ -6,7 +6,7 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 
 - Build: `npm install`. Start: `npm start` (`node index.js`). Node **>= 20.19.0**.
 - `PORT` is injected by the host; the app falls back to `5000`.
-- Set the environment variables below. `MONGODB_URI` and `JWT_SECRET` are boot-blocking; `BETTER_AUTH_SECRET` is required by the pre-deploy preflight (`node scripts/verify-env.mjs`), while `BETTER_AUTH_URL` is recommended (runtime falls back to the local API origin). Everything else is optional or feature-specific.
+- Set the environment variables below. `MONGODB_URI`, `JWT_SECRET` and `BETTER_AUTH_SECRET` are boot-blocking; `BETTER_AUTH_URL` is recommended (runtime falls back to the local API origin). Everything else is optional or feature-specific.
 
 ### Required to boot
 
@@ -14,10 +14,11 @@ Node/Express + MongoDB API. Deploy to Render, Railway, or any Node host.
 | --- | --- | --- |
 | `MONGODB_URI` | `mongodb+srv://<user>:<pass>@<cluster>/<db>` | Boot-blocking: `config/db.js` throws at import. Set the production Atlas connection string. |
 | `JWT_SECRET` | `<long-random-secret>` | Boot-blocking: `index.js` throws and the server exits at startup. Generate a long random value. |
+| `BETTER_AUTH_SECRET` | `<long-random-secret>` | Boot-blocking: `index.js` throws so BetterAuth sign-up/sign-in is never silently disabled in production. |
 
-### Required by deployment preflight
+### Recommended (checked by deployment preflight)
 
-`node scripts/verify-env.mjs` requires `BETTER_AUTH_SECRET` and recommends `BETTER_AUTH_URL` — both are **server-only**. Only a missing `BETTER_AUTH_SECRET` disables `/api/better-auth`; a missing `BETTER_AUTH_URL` falls back to the local API origin. The legacy JWT API still boots either way.
+`node scripts/verify-env.mjs` requires `BETTER_AUTH_SECRET` (also boot-blocking) and recommends `BETTER_AUTH_URL` — both are **server-only**. A missing `BETTER_AUTH_URL` falls back to the local API origin.
 
 | Variable | Example | Notes |
 | --- | --- | --- |

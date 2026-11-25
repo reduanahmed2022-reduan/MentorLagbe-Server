@@ -185,8 +185,11 @@ export function ensureReady() {
       if (isBetterAuthConfigured() && !process.env.BETTER_AUTH_URL) {
         console.warn("Warning: BETTER_AUTH_URL is not set; using the local API origin.");
       }
-      if (!isBetterAuthConfigured()) {
-        console.warn("Warning: BETTER_AUTH_SECRET is not set; /api/better-auth is disabled.");
+      // BetterAuth is a core assignment requirement and the deploy preflight
+      // already treats this secret as required. Fail fast so production never
+      // boots with sign-up/sign-in silently disabled.
+      if (!process.env.BETTER_AUTH_SECRET) {
+        throw new Error("BETTER_AUTH_SECRET is missing from .env file");
       }
 
       if (process.env.NODE_ENV === "production") {

@@ -125,7 +125,7 @@ Copy `.env.example`; **never commit `.env`** and never expose these in the Verce
 | `MONGODB_URI` | **Required at boot.** MongoDB Atlas connection string. |
 | `JWT_SECRET` | **Required at boot.** JWT signing secret. |
 | `JWT_EXPIRES_IN` | Token lifetime; default `7d`. |
-| `BETTER_AUTH_SECRET` | BetterAuth secret; required by the deploy preflight. |
+| `BETTER_AUTH_SECRET` | **Required at boot.** BetterAuth secret; also checked by the deploy preflight. |
 | `BETTER_AUTH_URL` | **API origin** used for callbacks: local `http://localhost:5000`, live `https://mentorlagbe-server-q3fr.onrender.com`. |
 | `CLIENT_URL` | Comma-separated allowed origins. In production Stripe uses the first non-localhost origin; locally it uses the first entry. Live value: `https://mentorlagbe-client-weld.vercel.app`. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth keys; both blank disables Google sign-in. |
@@ -227,6 +227,10 @@ BetterAuth's `user`/`account` tables are mapped onto `users`; sessions and verif
 | GET | `/api/applications/tutor-applicants` | Bearer: tutor | Applicants for own tuitions |
 | PATCH | `/api/applications/:id/status` | Bearer: tutor | Accept / reject |
 | DELETE | `/api/applications/:id` | Bearer: student | Cancel pending application |
+| GET/POST | `/api/bookmarks[/:tuitionId]` | Bearer: student | Saved tuitions (embedded in `users`) |
+| DELETE | `/api/bookmarks/:tuitionId` | Bearer: student | Remove a saved tuition |
+| GET | `/api/reviews/tuition/:tuitionId` | Public | Reviews for an approved/active tuition |
+| POST | `/api/reviews` | Bearer: student | Review after an accepted application (embedded in `tuitions`) |
 | GET | `/api/admin/users` | Bearer: admin | User list |
 | PATCH | `/api/admin/users/:id/role` | Bearer: admin | Change role |
 | GET | `/api/admin/tuitions` | Bearer: admin | All tuitions |

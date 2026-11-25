@@ -566,9 +566,15 @@ export const createTuition = async (req, res) => {
 
     // Free tutors may publish at most 2 tuitions; Pro tutors are unlimited.
     if (tutor.plan !== "pro") {
+      // Only live listings consume a slot: rejected or closed batches must not
+      // block a free tutor from publishing again.
       const existingCount = await db
         .collection("tuitions")
-        .countDocuments({ tutorEmail: tutor.email });
+        .countDocuments({
+          tutorEmail: tutor.email,
+          isActive: true,
+          approvalStatus: { $in: ["pending", "approved"] },
+        });
 
       if (existingCount >= 2) {
         return res.status(403).json({

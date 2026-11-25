@@ -206,6 +206,9 @@ export const getAdminStats = async (req, res) => {
       approvedTuitions,
       rejectedTuitions,
       totalApplications,
+      acceptedApplications,
+      pendingApplications,
+      rejectedApplications,
       revenue,
     ] = await Promise.all([
       usersCollection.countDocuments(),
@@ -222,6 +225,9 @@ export const getAdminStats = async (req, res) => {
         approvalStatus: "rejected",
       }),
       applicationsCollection.countDocuments(),
+      applicationsCollection.countDocuments({ status: "accepted" }),
+      applicationsCollection.countDocuments({ status: "pending" }),
+      applicationsCollection.countDocuments({ status: "rejected" }),
       paymentsCollection
         .aggregate([
           { $match: { paymentStatus: "paid" } },
@@ -241,6 +247,10 @@ export const getAdminStats = async (req, res) => {
         approvedTuitions,
         rejectedTuitions,
         totalApplications,
+        totalApplied: totalApplications,
+        acceptedApplications,
+        pendingApplications,
+        rejectedApplications,
         totalRevenue: revenue[0]?.total ?? 0,
       },
     });

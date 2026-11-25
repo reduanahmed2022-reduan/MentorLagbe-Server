@@ -3,8 +3,13 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// A short network timeout keeps checkout/verification well below the
+// serverless/Render request limit; the SDK default (~80s) can surface as 504.
 export const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      timeout: 15000,
+      maxNetworkRetries: 1,
+    })
   : null;
 
 // CORS accepts multiple origins, but Stripe redirects must be a single URL.
