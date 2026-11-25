@@ -152,7 +152,7 @@ const tutors = [
     reviews: 105,
     hourlyRate: 650,
     mode: "Offline",
-    image: "https://images.unsplash.com/photo-1580894732444-8ecded7900cd?auto=format&fit=crop&w=300&h=300&q=80",
+    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&h=300&q=80",
     verified: true,
     bio: "Chemistry instructor specializing in board examination preparation."
   }
