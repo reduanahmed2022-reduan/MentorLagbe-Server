@@ -26,7 +26,7 @@ const tutors = [
     reviews: 95,
     hourlyRate: 400,
     mode: "Online",
-    image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&h=300&q=80",
+    image: "https://res.cloudinary.com/dvfifeyu/image/upload/v1795593391/mentorlagbe/bppd9a88mkxowmzucb0p.jpg",
     verified: true,
     bio: "English language tutor specializing in grammar, writing and spoken English."
   },
