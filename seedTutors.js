@@ -26,7 +26,7 @@ const tutors = [
     reviews: 95,
     hourlyRate: 400,
     mode: "Online",
-    image: "https://i.pravatar.cc/300?img=12",
+    image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=300&h=300&q=80",
     verified: true,
     bio: "English language tutor specializing in grammar, writing and spoken English."
   },
@@ -152,7 +152,7 @@ const tutors = [
     reviews: 105,
     hourlyRate: 650,
     mode: "Offline",
-    image: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=300&h=300&q=80",
+    image: "https://images.unsplash.com/photo-1580894732444-8ecded7900cd?auto=format&fit=crop&w=300&h=300&q=80",
     verified: true,
     bio: "Chemistry instructor specializing in board examination preparation."
   }
