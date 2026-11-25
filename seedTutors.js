@@ -124,7 +124,7 @@ const tutors = [
     reviews: 42,
     hourlyRate: 400,
     mode: "Online",
-    image: "https://i.pravatar.cc/300?img=15",
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&h=300&q=80",
     verified: false,
     bio: "Dedicated physics tutor explaining difficult topics with practical examples."
   },
@@ -152,7 +152,7 @@ const tutors = [
     reviews: 105,
     hourlyRate: 650,
     mode: "Offline",
-    image: "https://i.pravatar.cc/300?img=53",
+    image: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=300&h=300&q=80",
     verified: true,
     bio: "Chemistry instructor specializing in board examination preparation."
   }
